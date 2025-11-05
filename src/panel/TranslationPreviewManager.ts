@@ -169,10 +169,24 @@ export class TranslationPreviewManager implements vscode.Disposable {
 
     preview.context = context;
 
+    const documentPath = this.getDocumentLabel(context.document);
+    const requestMeta = {
+      documentPath,
+      targetLanguage: context.resolvedConfig.targetLanguage,
+      version: context.document.version,
+      force: Boolean(options?.force),
+      invalidateCache: Boolean(options?.invalidateCache),
+    };
+
     if (!options?.force && context.document.version === preview.lastVersion) {
-      this.logger.info(`Skipping translation refresh for ${key}; document version unchanged.`);
+      this.logger.event('translation.skipped', {
+        ...requestMeta,
+        reason: 'documentVersionUnchanged',
+      });
       return;
     }
+
+    this.logger.event('translation.requested', requestMeta);
 
     preview.lastVersion = context.document.version;
 
@@ -184,6 +198,11 @@ export class TranslationPreviewManager implements vscode.Disposable {
 
     if (cached) {
       this.logger.info(`Serving translation for ${key} from cache.`);
+      this.logger.event('translation.cacheHit', {
+        ...requestMeta,
+        providerId: cached.providerId,
+        latencyMs: cached.latencyMs,
+      });
       this.postMessage(panel, {
         type: 'translationResult',
         payload: {
@@ -192,12 +211,16 @@ export class TranslationPreviewManager implements vscode.Disposable {
           providerId: cached.providerId,
           latencyMs: cached.latencyMs,
           targetLanguage: context.resolvedConfig.targetLanguage,
+          documentPath,
+          sourceVersion: context.document.version,
+          wasCached: true,
         },
       });
       return;
     }
 
     this.logger.info(`Rendering translation preview for ${key}.`);
+    this.logger.event('translation.fetchStarted', requestMeta);
 
     const controller = new AbortController();
     const previousController = this.abortControllers.get(key);
@@ -210,7 +233,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
       type: 'setLoading',
       payload: {
         isLoading: true,
-        documentPath: vscode.workspace.asRelativePath(context.document.uri),
+        documentPath,
         targetLanguage: context.resolvedConfig.targetLanguage,
       },
     });
@@ -236,21 +259,36 @@ export class TranslationPreviewManager implements vscode.Disposable {
           providerId: result.providerId,
           latencyMs: result.latencyMs,
           targetLanguage: context.resolvedConfig.targetLanguage,
+          documentPath,
+          sourceVersion: context.document.version,
+          wasCached: false,
         },
       });
       this.cache.set(context.document, context.resolvedConfig, result);
+      this.logger.event('translation.success', {
+        ...requestMeta,
+        providerId: result.providerId,
+        latencyMs: result.latencyMs,
+      });
     } catch (error) {
       if (error instanceof vscode.CancellationError) {
         this.logger.warn(`Translation request cancelled for ${key}.`);
+        this.logger.event('translation.cancelled', requestMeta);
         return;
       }
 
       this.logger.error('Failed to render translation preview.', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.event('translation.error', {
+        ...requestMeta,
+        error: message,
+      });
       this.postMessage(panel, {
         type: 'translationError',
         payload: {
           message,
+          documentPath,
+          targetLanguage: context.resolvedConfig.targetLanguage,
         },
       });
     } finally {
@@ -262,8 +300,12 @@ export class TranslationPreviewManager implements vscode.Disposable {
   }
 
   private buildTitle(document: vscode.TextDocument): string {
-    const relativePath = vscode.workspace.asRelativePath(document.uri, false);
+    const relativePath = this.getDocumentLabel(document);
     return `Translated: ${relativePath}`;
+  }
+
+  private getDocumentLabel(document: vscode.TextDocument): string {
+    return vscode.workspace.asRelativePath(document.uri, false);
   }
 
   private getWebviewHtml(webview: vscode.Webview): string {

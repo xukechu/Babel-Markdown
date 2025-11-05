@@ -20,6 +20,10 @@ export class ExtensionLogger implements vscode.Disposable {
     this.channel.appendLine(this.format('error', `${message}${details}`));
   }
 
+  event(name: string, data: Record<string, unknown>): void {
+    this.channel.appendLine(this.formatEvent(name, data));
+  }
+
   dispose(): void {
     this.channel.dispose();
   }
@@ -27,5 +31,18 @@ export class ExtensionLogger implements vscode.Disposable {
   private format(level: 'info' | 'warn' | 'error', message: string): string {
     const timestamp = new Date().toISOString();
     return `[${level.toUpperCase()} - ${timestamp}] ${message}`;
+  }
+
+  private formatEvent(name: string, data: Record<string, unknown>): string {
+    const timestamp = new Date().toISOString();
+    return `[EVENT - ${timestamp}] ${name} ${this.safeStringify(data)}`;
+  }
+
+  private safeStringify(data: Record<string, unknown>): string {
+    try {
+      return JSON.stringify(data, undefined, 0);
+    } catch (error) {
+      return JSON.stringify({ serializationError: (error as Error).message });
+    }
   }
 }

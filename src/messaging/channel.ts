@@ -7,12 +7,17 @@ export type HostToWebviewMessage =
         providerId: string;
         latencyMs: number;
         targetLanguage: string;
+        documentPath: string;
+        sourceVersion: number;
+        wasCached: boolean;
       };
     }
   | {
       type: 'translationError';
       payload: {
         message: string;
+        documentPath: string;
+        targetLanguage: string;
       };
     }
   | {

@@ -40,13 +40,13 @@ function postMessage(message: WebviewToHostMessage): void {
   vscodeApi.postMessage(message);
 }
 
-function renderHtml(html: string): void {
-  outputContainer.innerHTML = html;
-}
-
 let lastDocumentPath = '';
 let lastTargetLanguage = '';
 let pendingRetry = false;
+
+function renderHtml(html: string): void {
+  outputContainer.innerHTML = html;
+}
 
 function setLoading(isLoading: boolean, documentPath: string, targetLanguage: string): void {
   if (documentPath) {
@@ -72,21 +72,32 @@ function setLoading(isLoading: boolean, documentPath: string, targetLanguage: st
 
 function renderResult(payload: Extract<HostToWebviewMessage, { type: 'translationResult' }>['payload']): void {
   pendingRetry = false;
+  lastDocumentPath = payload.documentPath;
   lastTargetLanguage = payload.targetLanguage;
   errorContainer.hidden = true;
   retryButton.hidden = true;
   retryButton.disabled = false;
   statusContainer.dataset.state = 'idle';
-  statusContainer.textContent = `Provider: ${payload.providerId} · Target: ${payload.targetLanguage} · Latency: ${payload.latencyMs}ms`;
+  const metaSegments = [
+    payload.providerId,
+    `${payload.latencyMs}ms`,
+    `v${payload.sourceVersion}`,
+  ];
+
+  if (payload.wasCached) {
+    metaSegments.push('cached');
+  }
+
+  statusContainer.textContent = `Translated ${payload.documentPath} → ${payload.targetLanguage} — ${metaSegments.join(' · ')}`;
   renderHtml(payload.html);
 }
 
-function renderError(message: string): void {
+function renderError(payload: Extract<HostToWebviewMessage, { type: 'translationError' }>['payload']): void {
   pendingRetry = false;
   errorContainer.hidden = false;
-  errorContainer.textContent = message;
+  errorContainer.textContent = `Failed to translate ${payload.documentPath} → ${payload.targetLanguage}: ${payload.message}`;
   statusContainer.dataset.state = 'idle';
-  statusContainer.textContent = '';
+  statusContainer.textContent = `Last attempt · ${payload.documentPath} → ${payload.targetLanguage}`;
   outputContainer.innerHTML = '';
   retryButton.hidden = false;
   retryButton.disabled = false;
@@ -133,8 +144,8 @@ window.addEventListener('message', (event: MessageEvent<HostToWebviewMessage>) =
       renderResult(message.payload);
       break;
     case 'translationError':
-      setLoading(false, '', '');
-      renderError(message.payload.message);
+      setLoading(false, message.payload.documentPath, message.payload.targetLanguage);
+      renderError(message.payload);
       break;
     case 'scrollSync':
       applyScrollSync(message.payload.line, message.payload.totalLines);
