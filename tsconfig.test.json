@@ -3,8 +3,8 @@
     "module": "commonjs",
     "target": "es2020",
     "lib": ["ES2020"],
-    "outDir": "dist-test",
-    "rootDir": "test",
+  "outDir": "dist-test",
+  "rootDir": ".",
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
@@ -12,6 +12,6 @@
     "skipLibCheck": true,
     "types": ["node", "mocha", "vscode"]
   },
-  "include": ["test/**/*"],
+  "include": ["test/**/*", "src/**/*"],
   "exclude": ["dist", "dist-test", "node_modules"]
 }

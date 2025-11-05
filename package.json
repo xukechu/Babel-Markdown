@@ -23,6 +23,21 @@
         "command": "babelMdViewer.refreshPreview",
         "title": "Babel MD Viewer: Refresh Preview",
         "category": "Babel MD Viewer"
+      },
+      {
+        "command": "babelMdViewer.openTranslationPreview",
+        "title": "Babel MD Viewer: Open Translation Preview",
+        "category": "Babel MD Viewer"
+      },
+      {
+        "command": "babelMdViewer.refreshTranslationPreview",
+        "title": "Babel MD Viewer: Refresh Translation Preview",
+        "category": "Babel MD Viewer"
+      },
+      {
+        "command": "babelMdViewer.configureTranslationApiKey",
+        "title": "Babel MD Viewer: Set Translation API Key",
+        "category": "Babel MD Viewer"
       }
     ],
     "menus": {
@@ -30,6 +45,18 @@
         {
           "command": "babelMdViewer.openPreview",
           "group": "navigation@2",
+          "when": "resourceLangId == markdown"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "babelMdViewer.openTranslationPreview",
+          "group": "navigation@2",
+          "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "babelMdViewer.refreshTranslationPreview",
+          "group": "navigation@3",
           "when": "resourceLangId == markdown"
         }
       ]
@@ -54,6 +81,32 @@
           },
           "default": [],
           "description": "List of Babel plugins applied before rendering Markdown."
+        },
+        "babelMdViewer.translation.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "markdownDescription": "Base URL for the OpenAI-compatible translation endpoint."
+        },
+        "babelMdViewer.translation.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "API key used for translation calls. Stored securely via command palette when possible; avoid committing plain text values."
+        },
+        "babelMdViewer.translation.model": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "markdownDescription": "Model identifier used for translation requests."
+        },
+        "babelMdViewer.translation.targetLanguage": {
+          "type": "string",
+          "default": "en",
+          "markdownDescription": "Target language for translated Markdown output (e.g., `en`, `zh-CN`)."
+        },
+        "babelMdViewer.translation.timeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "markdownDescription": "Timeout (in milliseconds) for translation API requests."
         }
       }
     }
