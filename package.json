@@ -1,0 +1,86 @@
+{
+  "name": "babel-md-viewer",
+  "displayName": "Babel Markdown Viewer",
+  "description": "Preview Markdown files transformed with Babel-style pipelines inside VS Code.",
+  "publisher": "your-name",
+  "version": "0.0.1",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "babelMdViewer.openPreview",
+        "title": "Babel MD Viewer: Open Preview",
+        "category": "Babel MD Viewer"
+      },
+      {
+        "command": "babelMdViewer.refreshPreview",
+        "title": "Babel MD Viewer: Refresh Preview",
+        "category": "Babel MD Viewer"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "babelMdViewer.openPreview",
+          "group": "navigation@2",
+          "when": "resourceLangId == markdown"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Babel MD Viewer",
+      "properties": {
+        "babelMdViewer.previewTheme": {
+          "type": "string",
+          "default": "light",
+          "enum": [
+            "light",
+            "dark"
+          ],
+          "description": "Select the theme for the preview webview."
+        },
+        "babelMdViewer.transformPlugins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of Babel plugins applied before rendering Markdown."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p tsconfig.json",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "watch": "tsc -watch -p tsconfig.json",
+    "watch-tests": "tsc -watch -p tsconfig.test.json",
+    "lint": "eslint ./src ./test --ext .ts",
+    "test": "npm run compile && npm run compile-tests && node ./dist-test/runTest.js",
+    "check": "npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^20.12.7",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "@vscode/test-electron": "^2.3.4",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "mocha": "^10.2.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {}
+}
