@@ -95,9 +95,19 @@ function renderResult(payload: Extract<HostToWebviewMessage, { type: 'translatio
 function renderError(payload: Extract<HostToWebviewMessage, { type: 'translationError' }>['payload']): void {
   pendingRetry = false;
   errorContainer.hidden = false;
-  errorContainer.textContent = `Failed to translate ${payload.documentPath} → ${payload.targetLanguage}: ${payload.message}`;
+  const messageSegments = [
+    `Failed to translate ${payload.documentPath} → ${payload.targetLanguage}: ${payload.message}`,
+  ];
+
+  if (payload.hint) {
+    messageSegments.push(payload.hint);
+  }
+
+  errorContainer.textContent = messageSegments.join(' ');
   statusContainer.dataset.state = 'idle';
-  statusContainer.textContent = `Last attempt · ${payload.documentPath} → ${payload.targetLanguage}`;
+  statusContainer.textContent = payload.hint
+    ? `${payload.hint}`
+    : `Last attempt · ${payload.documentPath} → ${payload.targetLanguage}`;
   outputContainer.innerHTML = '';
   retryButton.hidden = false;
   retryButton.disabled = false;

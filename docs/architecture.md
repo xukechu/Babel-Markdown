@@ -15,7 +15,7 @@ This document captures architectural decisions for the Babel Markdown Viewer AI 
    - Initializes shared singletons (logger, translation service, secret manager).
 
 2. **Command Layer (`src/commands`)**
-   - Each command is encapsulated in its own module.
+   - Each command is encapsulated in its own module.∏
    - Commands validate prerequisites (configuration present) before delegating to services and UI.
    - Includes command context used by toolbar buttons and command palette.
 

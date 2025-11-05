@@ -18,6 +18,7 @@ export type HostToWebviewMessage =
         message: string;
         documentPath: string;
         targetLanguage: string;
+        hint?: string;
       };
     }
   | {

@@ -12,6 +12,14 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:babelMdViewer.openPreview",
+    "onCommand:babelMdViewer.refreshPreview",
+    "onCommand:babelMdViewer.openTranslationPreview",
+    "onCommand:babelMdViewer.refreshTranslationPreview",
+    "onCommand:babelMdViewer.configureTranslationApiKey",
+    "onLanguage:markdown"
+  ],
   "contributes": {
     "commands": [
       {
@@ -130,6 +138,7 @@
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
     "@vscode/test-electron": "^2.3.4",
+    "@vscode/vsce": "^3.6.2",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",

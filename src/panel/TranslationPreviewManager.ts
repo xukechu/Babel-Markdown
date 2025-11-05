@@ -21,6 +21,21 @@ interface RenderContext {
   resolvedConfig: ResolvedTranslationConfiguration;
 }
 
+type TranslationErrorCategory = 'authentication' | 'timeout' | 'rateLimit' | 'network' | 'unknown';
+
+interface ErrorResolutionAction {
+  title: string;
+  command: string;
+  args?: unknown[];
+}
+
+interface ErrorInterpretation {
+  hint?: string;
+  notification: string;
+  category: TranslationErrorCategory;
+  actions?: ErrorResolutionAction[];
+}
+
 export class TranslationPreviewManager implements vscode.Disposable {
   private readonly previews = new Map<string, PreviewEntry>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -202,6 +217,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
         ...requestMeta,
         providerId: cached.providerId,
         latencyMs: cached.latencyMs,
+        wasCached: true,
       });
       this.postMessage(panel, {
         type: 'translationResult',
@@ -269,6 +285,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
         ...requestMeta,
         providerId: result.providerId,
         latencyMs: result.latencyMs,
+        wasCached: false,
       });
     } catch (error) {
       if (error instanceof vscode.CancellationError) {
@@ -279,9 +296,16 @@ export class TranslationPreviewManager implements vscode.Disposable {
 
       this.logger.error('Failed to render translation preview.', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
+      const interpretation = this.interpretError(message, {
+        documentPath,
+        targetLanguage: context.resolvedConfig.targetLanguage,
+      });
+
       this.logger.event('translation.error', {
         ...requestMeta,
         error: message,
+        category: interpretation.category,
+        hint: interpretation.hint ?? null,
       });
       this.postMessage(panel, {
         type: 'translationError',
@@ -289,8 +313,46 @@ export class TranslationPreviewManager implements vscode.Disposable {
           message,
           documentPath,
           targetLanguage: context.resolvedConfig.targetLanguage,
+          hint: interpretation.hint,
         },
       });
+
+      if (interpretation.notification) {
+        const actions = interpretation.actions ?? [];
+        const actionLabels = actions.map((action) => action.title);
+
+        this.logger.event('translation.errorNotified', {
+          ...requestMeta,
+          category: interpretation.category,
+          notification: interpretation.notification,
+        });
+
+        void vscode.window
+          .showErrorMessage(interpretation.notification, ...actionLabels)
+          .then((selection) => {
+            if (!selection) {
+              return;
+            }
+
+            const chosen = actions.find((action) => action.title === selection);
+
+            if (!chosen) {
+              return;
+            }
+
+            this.logger.event('translation.errorActionInvoked', {
+              ...requestMeta,
+              category: interpretation.category,
+              action: chosen.title,
+            });
+
+            if (chosen.args && chosen.args.length > 0) {
+              void vscode.commands.executeCommand(chosen.command, ...chosen.args);
+            } else {
+              void vscode.commands.executeCommand(chosen.command);
+            }
+          });
+      }
     } finally {
       const storedController = this.abortControllers.get(key);
       if (storedController === controller) {
@@ -540,6 +602,81 @@ export class TranslationPreviewManager implements vscode.Disposable {
         totalLines: document.lineCount,
       },
     });
+  }
+
+  private interpretError(
+    message: string,
+    info: { documentPath: string; targetLanguage: string },
+  ): ErrorInterpretation {
+    const normalized = message.toLowerCase();
+    const baseNotification = `Translation failed for ${info.documentPath} → ${info.targetLanguage}.`;
+
+    if (normalized.includes('401') || normalized.includes('unauthorized') || normalized.includes('forbidden')) {
+      const hint = 'Authentication failed. Update the translation API key and try again.';
+      return {
+        category: 'authentication',
+        hint,
+        notification: `${baseNotification} ${hint} (${message})`,
+        actions: [{ title: 'Set API Key', command: 'babelMdViewer.configureTranslationApiKey' }],
+      };
+    }
+
+    if (
+      normalized.includes('timeout') ||
+      normalized.includes('timed out') ||
+      normalized.includes('etimedout')
+    ) {
+      const hint = 'The translation request timed out. Increase the timeout or try again.';
+      return {
+        category: 'timeout',
+        hint,
+        notification: `${baseNotification} ${hint} (${message})`,
+        actions: [
+          {
+            title: 'Adjust Timeout',
+            command: 'workbench.action.openSettings',
+            args: ['babelMdViewer.translation.timeoutMs'],
+          },
+        ],
+      };
+    }
+
+    if (normalized.includes('429') || normalized.includes('rate limit')) {
+      const hint = 'The translation service rate limit was reached. Wait a moment before retrying.';
+      return {
+        category: 'rateLimit',
+        hint,
+        notification: `${baseNotification} ${hint} (${message})`,
+      };
+    }
+
+    if (
+      normalized.includes('enotfound') ||
+      normalized.includes('econnrefused') ||
+      normalized.includes('network') ||
+      normalized.includes('fetch failed')
+    ) {
+      const hint = 'Network error. Check the translation API base URL or your internet connection.';
+      return {
+        category: 'network',
+        hint,
+        notification: `${baseNotification} ${hint} (${message})`,
+        actions: [
+          {
+            title: 'Open Translation Settings',
+            command: 'workbench.action.openSettings',
+            args: ['babelMdViewer.translation'],
+          },
+        ],
+      };
+    }
+
+    const hint = 'Check the extension output channel for more details and retry.';
+    return {
+      category: 'unknown',
+      hint,
+      notification: `${baseNotification} ${hint} (${message})`,
+    };
   }
 
   private handleScrollRequest(document: vscode.TextDocument, fraction: number): void {
