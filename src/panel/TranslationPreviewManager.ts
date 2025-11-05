@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import type { ExtensionConfiguration } from '../types/config';
 import type { ResolvedTranslationConfiguration, TranslationResult } from '../types/translation';
 import { TranslationService } from '../services/TranslationService';
+import { TranslationCache } from '../services/TranslationCache';
 import { escapeHtml } from '../utils/text';
 import { ExtensionLogger } from '../utils/logger';
 
@@ -22,6 +23,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
   private readonly previews = new Map<string, PreviewEntry>();
   private readonly disposables: vscode.Disposable[] = [];
   private readonly abortControllers = new Map<string, AbortController>();
+  private readonly cache = new TranslationCache();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -36,6 +38,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
           this.logger.info(`Closing translation preview for ${key} (source document closed).`);
           preview.panel.dispose();
         }
+        this.cache.clearForDocument(document);
       }),
     );
   }
@@ -98,7 +101,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
       lastVersion: context.document.version,
     });
 
-    await this.render(panel, context);
+    await this.render(panel, context, { force: true });
   }
 
   async refreshPreview(context: RenderContext): Promise<boolean> {
@@ -109,14 +112,14 @@ export class TranslationPreviewManager implements vscode.Disposable {
       return false;
     }
 
-    await this.render(preview.panel, context, { force: true });
+    await this.render(preview.panel, context, { force: true, invalidateCache: true });
     return true;
   }
 
   private async render(
     panel: vscode.WebviewPanel,
     context: RenderContext,
-    options?: { force?: boolean },
+    options?: { force?: boolean; invalidateCache?: boolean },
   ): Promise<void> {
     const key = context.document.uri.toString();
     const preview = this.previews.get(key);
@@ -130,8 +133,21 @@ export class TranslationPreviewManager implements vscode.Disposable {
       return;
     }
 
-    this.logger.info(`Rendering translation preview for ${key}.`);
     preview.lastVersion = context.document.version;
+
+    if (options?.invalidateCache) {
+      this.cache.clearForDocument(context.document);
+    }
+
+    const cached = this.cache.get(context.document, context.resolvedConfig);
+
+    if (cached) {
+      this.logger.info(`Serving translation for ${key} from cache.`);
+      panel.webview.html = this.renderResultHtml(cached, context);
+      return;
+    }
+
+    this.logger.info(`Rendering translation preview for ${key}.`);
 
     const controller = new AbortController();
     const previousController = this.abortControllers.get(key);
@@ -156,6 +172,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
 
       panel.title = this.buildTitle(context.document);
       panel.webview.html = this.renderResultHtml(result, context);
+  this.cache.set(context.document, context.resolvedConfig, result);
     } catch (error) {
       if (error instanceof vscode.CancellationError) {
         this.logger.warn(`Translation request cancelled for ${key}.`);

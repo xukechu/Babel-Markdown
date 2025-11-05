@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ResolvedTranslationConfiguration, TranslationResult } from '../types/translation';
+import { delay } from '../utils/async';
 import { ExtensionLogger } from '../utils/logger';
 
 export interface TranslateRequest {
@@ -31,72 +32,85 @@ interface OpenAIResponseChunk {
 }
 
 export class OpenAITranslationClient {
-  constructor(private readonly logger: ExtensionLogger) {}
+  constructor(private readonly logger: ExtensionLogger, private readonly maxRetries = 2) {}
 
   async translate(request: TranslateRequest): Promise<TranslationResult> {
     const { resolvedConfig, documentText, fileName, signal } = request;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), resolvedConfig.timeoutMs);
-    const combinedSignal = this.combineSignals(signal, controller.signal);
-
     const url = `${resolvedConfig.apiBaseUrl.replace(/\/$/, '')}/chat/completions`;
     const prompt = this.buildPrompt(documentText, resolvedConfig.targetLanguage, fileName);
 
-    const started = Date.now();
-    let response: Response | undefined;
+    let attempt = 0;
+    let lastError: unknown;
 
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${resolvedConfig.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: resolvedConfig.model,
-          messages: prompt,
-          temperature: 0.2,
-          top_p: 1,
-          response_format: { type: 'text' },
-        }),
-        signal: combinedSignal ?? controller.signal,
-      });
-    } catch (error) {
-      if (combinedSignal?.aborted || controller.signal.aborted) {
-        throw new vscode.CancellationError();
+    while (attempt <= this.maxRetries) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), resolvedConfig.timeoutMs);
+      const combinedSignal = this.combineSignals(signal, controller.signal);
+
+      const started = Date.now();
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${resolvedConfig.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: resolvedConfig.model,
+            messages: prompt,
+            temperature: 0.2,
+            top_p: 1,
+            response_format: { type: 'text' },
+          }),
+          signal: combinedSignal ?? controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorBody = await this.safeReadBody(response);
+          throw new Error(
+            `Translation API responded with ${response.status}: ${errorBody ?? 'No body'}.`,
+          );
+        }
+
+        const body = (await response.json()) as OpenAIResponseChunk;
+        const message = body.choices?.[0]?.message?.content;
+
+        if (!message) {
+          throw new Error('Translation API returned an empty response.');
+        }
+
+        const latency = Date.now() - started;
+
+        return {
+          markdown: message,
+          providerId: body.model || resolvedConfig.model,
+          latencyMs: latency,
+        };
+      } catch (error) {
+        if (combinedSignal?.aborted || controller.signal.aborted) {
+          throw new vscode.CancellationError();
+        }
+
+        clearTimeout(timeoutId);
+
+        lastError = error;
+        attempt += 1;
+
+        if (attempt > this.maxRetries) {
+          break;
+        }
+
+        const delayMs = this.calculateBackoff(attempt);
+        this.logger.warn(`Translation attempt ${attempt} failed. Retrying in ${delayMs}ms.`);
+        await delay(delayMs);
       }
-
-      clearTimeout(timeoutId);
-      this.logger.error('Failed to call translation API.', error);
-      throw error;
     }
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorBody = await this.safeReadBody(response);
-      this.logger.error(
-        `Translation API responded with ${response.status}: ${errorBody ?? 'No body'}.`,
-      );
-      throw new Error(`Translation failed with status ${response.status}.`);
-    }
-
-    const body = (await response.json()) as OpenAIResponseChunk;
-    const message = body.choices?.[0]?.message?.content;
-
-    if (!message) {
-      this.logger.error('Translation API returned an empty response.', body);
-      throw new Error('Translation API returned an empty response.');
-    }
-
-    const latency = Date.now() - started;
-
-    return {
-      markdown: message,
-      providerId: body.model || resolvedConfig.model,
-      latencyMs: latency,
-    };
+    this.logger.error('Exhausted translation retries.', lastError);
+    throw lastError instanceof Error ? lastError : new Error('Translation failed.');
   }
 
   private buildPrompt(
@@ -149,5 +163,12 @@ ${markdown}`;
   this.logger.warn('Failed to read error response body.');
       return undefined;
     }
+  }
+
+  private calculateBackoff(attempt: number): number {
+    const base = 300;
+    const max = 2000;
+    const jitter = Math.random() * 100;
+    return Math.min(base * Math.pow(2, attempt - 1) + jitter, max);
   }
 }

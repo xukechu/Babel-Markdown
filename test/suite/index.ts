@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import { SecretStorageService } from '../../src/services/SecretStorageService';
 import { BabelMarkdownService } from '../../src/services/BabelMarkdownService';
+import { TranslationCache } from '../../src/services/TranslationCache';
 import type { TranslationConfiguration } from '../../src/types/config';
 import { getExtensionConfiguration } from '../../src/utils/config';
 import { ExtensionLogger } from '../../src/utils/logger';
@@ -33,6 +34,10 @@ class InMemorySecretStorage implements vscode.SecretStorage {
   async keys(): Promise<string[]> {
     return Array.from(this.storageMap.keys());
   }
+}
+
+class InMemoryTextDocument {
+  constructor(public readonly uri: vscode.Uri, public version: number) {}
 }
 
 suite('Configuration Helper', () => {
@@ -129,6 +134,88 @@ suite('SecretStorageService', () => {
     assert.strictEqual(cleared, undefined);
 
     logger.dispose();
+  });
+});
+
+suite('TranslationCache', () => {
+  test('stores and retrieves cache entries within ttl', () => {
+    const cache = new TranslationCache({ ttlMs: 1000, maxEntries: 2 });
+    const doc = new InMemoryTextDocument(vscode.Uri.parse('file:///doc.md'), 1);
+    const config = {
+      apiBaseUrl: 'https://example.com',
+      apiKey: 'sk-example',
+      model: 'gpt-test',
+      targetLanguage: 'en',
+      timeoutMs: 1000,
+    };
+
+    const result = {
+      markdown: 'translated',
+      providerId: 'mock',
+      latencyMs: 42,
+    };
+
+    cache.set(doc, config, result);
+
+    const cached = cache.get(doc, config);
+    assert.deepStrictEqual(cached, result);
+  });
+
+  test('evicts entries when ttl expires', async () => {
+    const cache = new TranslationCache({ ttlMs: 10, maxEntries: 2 });
+    const doc = new InMemoryTextDocument(vscode.Uri.parse('file:///doc.md'), 1);
+    const config = {
+      apiBaseUrl: 'https://example.com',
+      apiKey: 'sk-example',
+      model: 'gpt-test',
+      targetLanguage: 'en',
+      timeoutMs: 1000,
+    };
+
+    const result = {
+      markdown: 'translated',
+      providerId: 'mock',
+      latencyMs: 42,
+    };
+
+    cache.set(doc, config, result);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    const cached = cache.get(doc, config);
+    assert.strictEqual(cached, undefined);
+  });
+
+  test('evicts oldest entry when exceeding max entries', () => {
+    const cache = new TranslationCache({ ttlMs: 1000, maxEntries: 1 });
+    const docA = new InMemoryTextDocument(vscode.Uri.parse('file:///a.md'), 1);
+    const docB = new InMemoryTextDocument(vscode.Uri.parse('file:///b.md'), 1);
+    const config = {
+      apiBaseUrl: 'https://example.com',
+      apiKey: 'sk-example',
+      model: 'gpt-test',
+      targetLanguage: 'en',
+      timeoutMs: 1000,
+    };
+
+    const resultA = {
+      markdown: 'A',
+      providerId: 'mock',
+      latencyMs: 10,
+    };
+    const resultB = {
+      markdown: 'B',
+      providerId: 'mock',
+      latencyMs: 20,
+    };
+
+    cache.set(docA, config, resultA);
+    cache.set(docB, config, resultB);
+
+    const cachedA = cache.get(docA, config);
+    const cachedB = cache.get(docB, config);
+
+    assert.strictEqual(cachedA, undefined);
+    assert.deepStrictEqual(cachedB, resultB);
   });
 });
 
