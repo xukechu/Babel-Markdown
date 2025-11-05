@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 import type { ExtensionConfiguration } from '../types/config';
 import type { ResolvedTranslationConfiguration, TranslationResult } from '../types/translation';
+import { OpenAITranslationClient } from './OpenAITranslationClient';
 import { escapeHtml } from '../utils/text';
 import { ExtensionLogger } from '../utils/logger';
 
@@ -13,39 +14,55 @@ export interface TranslationRequestContext {
 }
 
 export class TranslationService {
-  constructor(private readonly logger: ExtensionLogger) {}
+  constructor(
+    private readonly logger: ExtensionLogger,
+    private readonly openAIClient: OpenAITranslationClient,
+  ) {}
 
   async translateDocument(context: TranslationRequestContext): Promise<TranslationResult> {
+    const relativePath = vscode.workspace.asRelativePath(context.document.uri);
+
     this.logger.info(
-      `Translating ${vscode.workspace.asRelativePath(context.document.uri)} to ${context.resolvedConfig.targetLanguage} with model ${context.resolvedConfig.model}.`,
+      `Translating ${relativePath} to ${context.resolvedConfig.targetLanguage} with model ${context.resolvedConfig.model}.`,
     );
 
     if (context.signal?.aborted) {
       throw new vscode.CancellationError();
     }
 
-    // Placeholder implementation until OpenAI integration lands.
     const text = context.document.getText();
-    await this.delay(150);
 
-    if (context.signal?.aborted) {
-      throw new vscode.CancellationError();
+    if (!text.trim()) {
+      return {
+        markdown: '_The source document is empty; nothing to translate._',
+        providerId: 'noop',
+        latencyMs: 0,
+      };
     }
 
-    const escaped = escapeHtml(text);
-    const markdown = `> **Translated preview (${context.resolvedConfig.targetLanguage})**  \
-> Model: ${context.resolvedConfig.model}\n\n${escaped}`;
+    try {
+      const result = await this.openAIClient.translate({
+        documentText: text,
+        fileName: relativePath,
+        resolvedConfig: context.resolvedConfig,
+        signal: context.signal,
+      });
 
-    return {
-      markdown,
-      providerId: 'mock-openai',
-      latencyMs: 150,
-    };
-  }
+      return result;
+    } catch (error) {
+      if (error instanceof vscode.CancellationError) {
+        throw error;
+      }
 
-  private async delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
+      this.logger.error('Translation service failed.', error);
+
+      const escaped = escapeHtml(text);
+      return {
+        markdown: `> **Translation failed**  \
+> Target language: ${context.resolvedConfig.targetLanguage}\n\n${escaped}`,
+        providerId: 'error-fallback',
+        latencyMs: 0,
+      };
+    }
   }
 }

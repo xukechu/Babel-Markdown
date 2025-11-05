@@ -9,6 +9,7 @@ import { MarkdownPreviewPanel } from '../panel/MarkdownPreviewPanel';
 import { TranslationPreviewManager } from '../panel/TranslationPreviewManager';
 import { BabelMarkdownService } from '../services/BabelMarkdownService';
 import { SecretStorageService } from '../services/SecretStorageService';
+import { OpenAITranslationClient } from '../services/OpenAITranslationClient';
 import { TranslationService } from '../services/TranslationService';
 import { ExtensionLogger } from '../utils/logger';
 
@@ -17,7 +18,8 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Dispo
   const service = new BabelMarkdownService(logger);
   const previewPanel = new MarkdownPreviewPanel(context.extensionUri, service, logger);
   const secretStorageService = new SecretStorageService(context.secrets, logger);
-  const translationService = new TranslationService(logger);
+  const openAIClient = new OpenAITranslationClient(logger);
+  const translationService = new TranslationService(logger, openAIClient);
   const translationPreviewManager = new TranslationPreviewManager(
     context.extensionUri,
     translationService,
