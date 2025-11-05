@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import type { ResolvedTranslationConfiguration, TranslationResult } from '../types/translation';
+import type { RawTranslationResult, ResolvedTranslationConfiguration } from '../types/translation';
 import { delay } from '../utils/async';
 import { ExtensionLogger } from '../utils/logger';
 
@@ -34,7 +34,7 @@ interface OpenAIResponseChunk {
 export class OpenAITranslationClient {
   constructor(private readonly logger: ExtensionLogger, private readonly maxRetries = 2) {}
 
-  async translate(request: TranslateRequest): Promise<TranslationResult> {
+  async translate(request: TranslateRequest): Promise<RawTranslationResult> {
     const { resolvedConfig, documentText, fileName, signal } = request;
     const url = `${resolvedConfig.apiBaseUrl.replace(/\/$/, '')}/chat/completions`;
     const prompt = this.buildPrompt(documentText, resolvedConfig.targetLanguage, fileName);

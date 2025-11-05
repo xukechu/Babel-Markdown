@@ -6,8 +6,12 @@ export interface ResolvedTranslationConfiguration {
   timeoutMs: number;
 }
 
-export interface TranslationResult {
+export interface RawTranslationResult {
   markdown: string;
   providerId: string;
   latencyMs: number;
+}
+
+export interface TranslationResult extends RawTranslationResult {
+  html: string;
 }

@@ -1,10 +1,15 @@
 import * as vscode from 'vscode';
 
 import type { ExtensionConfiguration } from '../types/config';
-import type { ResolvedTranslationConfiguration, TranslationResult } from '../types/translation';
+import type {
+  RawTranslationResult,
+  ResolvedTranslationConfiguration,
+  TranslationResult,
+} from '../types/translation';
 import { OpenAITranslationClient } from './OpenAITranslationClient';
 import { escapeHtml } from '../utils/text';
 import { ExtensionLogger } from '../utils/logger';
+import { renderMarkdownToHtml } from '../utils/markdown';
 
 export interface TranslationRequestContext {
   document: vscode.TextDocument;
@@ -33,11 +38,11 @@ export class TranslationService {
     const text = context.document.getText();
 
     if (!text.trim()) {
-      return {
+      return this.composeResult({
         markdown: '_The source document is empty; nothing to translate._',
         providerId: 'noop',
         latencyMs: 0,
-      };
+      });
     }
 
     try {
@@ -48,7 +53,7 @@ export class TranslationService {
         signal: context.signal,
       });
 
-      return result;
+      return this.composeResult(result);
     } catch (error) {
       if (error instanceof vscode.CancellationError) {
         throw error;
@@ -57,12 +62,21 @@ export class TranslationService {
       this.logger.error('Translation service failed.', error);
 
       const escaped = escapeHtml(text);
-      return {
-        markdown: `> **Translation failed**  \
-> Target language: ${context.resolvedConfig.targetLanguage}\n\n${escaped}`,
+      const markdown = `> **Translation failed**  \
+> Target language: ${context.resolvedConfig.targetLanguage}\n\n${escaped}`;
+
+      return this.composeResult({
+        markdown,
         providerId: 'error-fallback',
         latencyMs: 0,
-      };
+      });
     }
+  }
+
+  private composeResult(result: RawTranslationResult): TranslationResult {
+    return {
+      ...result,
+      html: renderMarkdownToHtml(result.markdown),
+    };
   }
 }

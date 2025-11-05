@@ -151,6 +151,7 @@ suite('TranslationCache', () => {
 
     const result = {
       markdown: 'translated',
+      html: '<p>translated</p>',
       providerId: 'mock',
       latencyMs: 42,
     };
@@ -174,6 +175,7 @@ suite('TranslationCache', () => {
 
     const result = {
       markdown: 'translated',
+      html: '<p>translated</p>',
       providerId: 'mock',
       latencyMs: 42,
     };
@@ -199,11 +201,13 @@ suite('TranslationCache', () => {
 
     const resultA = {
       markdown: 'A',
+      html: '<p>A</p>',
       providerId: 'mock',
       latencyMs: 10,
     };
     const resultB = {
       markdown: 'B',
+      html: '<p>B</p>',
       providerId: 'mock',
       latencyMs: 20,
     };

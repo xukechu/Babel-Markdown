@@ -13,6 +13,7 @@ const vscodeApi = (typeof acquireVsCodeApi !== 'undefined'
 const outputElement = document.getElementById('preview-content');
 const statusElement = document.getElementById('preview-status');
 const errorElement = document.getElementById('preview-error');
+const retryElement = document.getElementById('preview-retry');
 
 if (!(outputElement instanceof HTMLDivElement)) {
   throw new Error('Translation preview DOM failed to initialize: preview-content.');
@@ -26,37 +27,69 @@ if (!(errorElement instanceof HTMLDivElement)) {
   throw new Error('Translation preview DOM failed to initialize: preview-error.');
 }
 
+if (!(retryElement instanceof HTMLButtonElement)) {
+  throw new Error('Translation preview DOM failed to initialize: preview-retry.');
+}
+
 const outputContainer = outputElement;
 const statusContainer = statusElement;
 const errorContainer = errorElement;
+const retryButton = retryElement;
 
 function postMessage(message: WebviewToHostMessage): void {
   vscodeApi.postMessage(message);
 }
 
-function renderMarkdown(markdown: string): void {
-  outputContainer.textContent = markdown;
+function renderHtml(html: string): void {
+  outputContainer.innerHTML = html;
 }
 
+let lastDocumentPath = '';
+let lastTargetLanguage = '';
+let pendingRetry = false;
+
 function setLoading(isLoading: boolean, documentPath: string, targetLanguage: string): void {
+  if (documentPath) {
+    lastDocumentPath = documentPath;
+  }
+
+  if (targetLanguage) {
+    lastTargetLanguage = targetLanguage;
+  }
+
+  statusContainer.dataset.state = isLoading ? 'loading' : 'idle';
+
   if (isLoading) {
-    statusContainer.textContent = `Translating ${documentPath} → ${targetLanguage}…`;
-  } else {
+    const documentLabel = lastDocumentPath || 'current document';
+    const languageLabel = lastTargetLanguage || 'configured language';
+    statusContainer.textContent = `Translating ${documentLabel} → ${languageLabel}…`;
+    retryButton.hidden = true;
+    retryButton.disabled = true;
+  } else if (!pendingRetry) {
     statusContainer.textContent = '';
   }
 }
 
 function renderResult(payload: Extract<HostToWebviewMessage, { type: 'translationResult' }>['payload']): void {
+  pendingRetry = false;
+  lastTargetLanguage = payload.targetLanguage;
   errorContainer.hidden = true;
+  retryButton.hidden = true;
+  retryButton.disabled = false;
+  statusContainer.dataset.state = 'idle';
   statusContainer.textContent = `Provider: ${payload.providerId} · Target: ${payload.targetLanguage} · Latency: ${payload.latencyMs}ms`;
-  renderMarkdown(payload.markdown);
+  renderHtml(payload.html);
 }
 
 function renderError(message: string): void {
+  pendingRetry = false;
   errorContainer.hidden = false;
   errorContainer.textContent = message;
+  statusContainer.dataset.state = 'idle';
   statusContainer.textContent = '';
-  outputContainer.textContent = '';
+  outputContainer.innerHTML = '';
+  retryButton.hidden = false;
+  retryButton.disabled = false;
 }
 let suppressScrollEvents = false;
 let suppressTimer: number | undefined;
@@ -132,4 +165,15 @@ document.addEventListener('scroll', () => {
     const fraction = window.scrollY / maxScroll;
     postMessage({ type: 'requestScrollSync', payload: { fraction } });
   });
+});
+
+retryButton.addEventListener('click', () => {
+  if (pendingRetry) {
+    return;
+  }
+
+  pendingRetry = true;
+  retryButton.disabled = true;
+  setLoading(true, lastDocumentPath, lastTargetLanguage);
+  postMessage({ type: 'requestRetry' });
 });

@@ -3,6 +3,7 @@ export type HostToWebviewMessage =
       type: 'translationResult';
       payload: {
         markdown: string;
+        html: string;
         providerId: string;
         latencyMs: number;
         targetLanguage: string;
@@ -36,6 +37,9 @@ export type WebviewToHostMessage =
       payload: {
         fraction: number;
       };
+    }
+  | {
+      type: 'requestRetry';
     }
   | {
       type: 'log';

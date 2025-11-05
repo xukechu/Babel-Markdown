@@ -11,6 +11,7 @@ interface PreviewEntry {
   panel: vscode.WebviewPanel;
   disposable: vscode.Disposable;
   lastVersion: number;
+  context: RenderContext;
   rangeSubscription?: vscode.Disposable;
 }
 
@@ -68,8 +69,9 @@ export class TranslationPreviewManager implements vscode.Disposable {
     const existing = this.previews.get(key);
 
     if (existing) {
+      existing.context = context;
       existing.panel.reveal(undefined, true);
-      this.registerScrollListener(key, context.document);
+      this.registerScrollListener(key);
       this.postVisibleRange(existing.panel, context.document);
       await this.render(existing.panel, context);
       return;
@@ -90,13 +92,26 @@ export class TranslationPreviewManager implements vscode.Disposable {
     panel.webview.html = this.getWebviewHtml(panel.webview);
     panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'assets', 'icons', 'preview.svg');
     panel.webview.onDidReceiveMessage((message: WebviewToHostMessage) => {
-      if (message.type === 'log') {
-        this.logger.info(`[Webview] ${message.payload.level}: ${message.payload.message}`);
+      const previewEntry = this.previews.get(key);
+
+      if (!previewEntry) {
+        this.logger.warn('Received webview message for a disposed translation preview.');
         return;
       }
 
-      if (message.type === 'requestScrollSync') {
-        this.handleScrollRequest(context.document, message.payload.fraction);
+      switch (message.type) {
+        case 'log':
+          this.logger.info(`[Webview] ${message.payload.level}: ${message.payload.message}`);
+          break;
+        case 'requestScrollSync':
+          this.handleScrollRequest(previewEntry.context.document, message.payload.fraction);
+          break;
+        case 'requestRetry':
+          void this.render(previewEntry.panel, previewEntry.context, { force: true, invalidateCache: true });
+          break;
+        default:
+          this.logger.warn(`Unhandled message from webview: ${(message as { type: string }).type}`);
+          break;
       }
     });
 
@@ -117,10 +132,11 @@ export class TranslationPreviewManager implements vscode.Disposable {
       panel,
       disposable,
       lastVersion: context.document.version,
+      context,
     };
 
     this.previews.set(key, entry);
-    this.registerScrollListener(key, context.document);
+    this.registerScrollListener(key);
     this.postVisibleRange(panel, context.document);
 
     await this.render(panel, context, { force: true });
@@ -134,6 +150,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
       return false;
     }
 
+    preview.context = context;
     await this.render(preview.panel, context, { force: true, invalidateCache: true });
     return true;
   }
@@ -149,6 +166,8 @@ export class TranslationPreviewManager implements vscode.Disposable {
     if (!preview) {
       return;
     }
+
+    preview.context = context;
 
     if (!options?.force && context.document.version === preview.lastVersion) {
       this.logger.info(`Skipping translation refresh for ${key}; document version unchanged.`);
@@ -169,6 +188,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
         type: 'translationResult',
         payload: {
           markdown: cached.markdown,
+          html: cached.html,
           providerId: cached.providerId,
           latencyMs: cached.latencyMs,
           targetLanguage: context.resolvedConfig.targetLanguage,
@@ -212,6 +232,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
         type: 'translationResult',
         payload: {
           markdown: result.markdown,
+          html: result.html,
           providerId: result.providerId,
           latencyMs: result.latencyMs,
           targetLanguage: context.resolvedConfig.targetLanguage,
@@ -281,10 +302,61 @@ export class TranslationPreviewManager implements vscode.Disposable {
       box-sizing: border-box;
     }
 
+    .preview__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .preview__status {
+      flex: 1 1 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       margin: 0;
       font-size: 0.85rem;
       color: var(--vscode-descriptionForeground);
+      min-height: 1.25rem;
+    }
+
+    .preview__status[data-state='loading']::before {
+      content: '';
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--vscode-progressBar-background);
+      border-right-color: var(--vscode-progressBar-background);
+      animation: preview-spin 0.8s linear infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .preview__status[data-state='loading']::before {
+        animation-duration: 2s;
+      }
+    }
+
+    .preview__retry {
+      flex: 0 0 auto;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      border: 1px solid var(--vscode-button-secondaryBorder, transparent);
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      cursor: pointer;
+      transition: background 150ms ease;
+    }
+
+    .preview__retry:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+
+    .preview__retry[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .preview__error {
@@ -298,7 +370,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
 
     .preview__content {
       line-height: 1.6;
-      white-space: pre-wrap;
+      white-space: normal;
       word-break: break-word;
     }
 
@@ -309,11 +381,43 @@ export class TranslationPreviewManager implements vscode.Disposable {
     code, pre {
       font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
     }
+
+    pre {
+      background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3));
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    @keyframes preview-spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
 <body>
   <main>
-    <p id="preview-status" class="preview__status" role="status" aria-live="polite"></p>
+    <header class="preview__header">
+      <p id="preview-status" class="preview__status" role="status" aria-live="polite" data-state="idle"></p>
+      <button id="preview-retry" class="preview__retry" type="button" hidden>Retry translation</button>
+    </header>
     <div id="preview-error" class="preview__error" role="alert" hidden></div>
     <article id="preview-content" class="preview__content" aria-label="Translated Markdown"></article>
   </main>
@@ -340,7 +444,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
     );
   }
 
-  private registerScrollListener(key: string, document: vscode.TextDocument): void {
+  private registerScrollListener(key: string): void {
     const preview = this.previews.get(key);
 
     preview?.rangeSubscription?.dispose();
@@ -348,6 +452,8 @@ export class TranslationPreviewManager implements vscode.Disposable {
     if (!preview) {
       return;
     }
+
+    const { document } = preview.context;
 
     const subscription = vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
       if (event.textEditor.document !== document) {
