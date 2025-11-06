@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the "Babel Markdown Viewer" extension will be documented in this file.
+All notable changes to the "Babel Markdown" extension will be documented in this file.
 
 ## [0.0.4] - 2025-11-05
 - Streamlined build/package scripts and added `pnpm run package` for one-step VSIX generation with Vite-bundled artifacts.

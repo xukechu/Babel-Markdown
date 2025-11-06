@@ -1,7 +1,7 @@
-# Feature Requirements – Babel Markdown Viewer AI Translation
+# Feature Requirements – Babel Markdown AI Translation
 
 ## Summary
-- **Product name:** Babel Markdown Viewer (AI translation edition)
+- **Product name:** Babel Markdown (AI translation edition)
 - **Primary users:** VS Code users working with Markdown who need real-time translated previews.
 - **Core idea:** While reading a Markdown document, the user can open a side-by-side preview that shows an AI-translated version rendered with the same Markdown formatting. The extension handles OpenAI-compatible API configuration, translation requests, and synchronized preview UX.
 
@@ -18,7 +18,7 @@
 
 ## User Journeys
 1. **Configure Translation API**
-   - User opens VS Code settings, searches for "Babel MD Viewer".
+  - User opens VS Code settings, searches for "Babel Markdown".
    - User enters OpenAI-compatible base URL and API key.
    - Optionally adjusts model name and output language preference.
 

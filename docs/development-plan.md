@@ -1,4 +1,4 @@
-# Development Plan – Babel Markdown Viewer AI Translation
+# Development Plan – Babel Markdown AI Translation
 
 ## Guiding Principles
 - Deliver value incrementally: start with configuration + basic preview, then enrich UX.

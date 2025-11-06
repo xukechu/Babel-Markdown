@@ -1,6 +1,6 @@
-# Babel Markdown Viewer
+# Babel Markdown
 
-A VS Code extension that renders Markdown files through a Babel-powered transformation pipeline before displaying them inside a preview webview. This repository is initialized with a clean TypeScript setup, testing scaffold, and opinionated linting so you can focus on feature work.
+# Babel Markdown is a VS Code extension that renders Markdown files through a Babel-powered transformation pipeline before displaying them inside a preview webview. This repository is initialized with a clean TypeScript setup, testing scaffold, and opinionated linting so you can focus on feature work.
 
 ## Getting Started
 

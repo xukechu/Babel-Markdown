@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This document captures architectural decisions for the Babel Markdown Viewer AI translation extension.
+This document captures architectural decisions for the Babel Markdown AI translation extension.
 
 ## Goals
 - Provide a clean separation between VS Code integration (commands, activation) and domain logic (Markdown translation pipeline).

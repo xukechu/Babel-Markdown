@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 export class ExtensionLogger implements vscode.Disposable {
   private readonly channel: vscode.OutputChannel;
 
-  constructor(name = 'Babel MD Viewer') {
+  constructor(name = 'Babel Markdown') {
     this.channel = vscode.window.createOutputChannel(name);
   }
 

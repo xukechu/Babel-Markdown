@@ -184,7 +184,7 @@ suite('Configuration Helper', () => {
 
 suite('SecretStorageService', () => {
   test('stores, retrieves and clears translation api key', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Secret Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Secret Test)');
     const storage = new InMemorySecretStorage();
     const service = new SecretStorageService(storage, logger);
 
@@ -320,7 +320,7 @@ suite('TranslationCache', () => {
 
 suite('Babel Markdown Service', () => {
   test('returns escaped HTML for markdown content', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Test)');
     const service = new BabelMarkdownService(logger);
 
     const document = await vscode.workspace.openTextDocument({
@@ -362,7 +362,7 @@ suite('TranslationService', () => {
   };
 
   test('returns rendered html alongside markdown result', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Translation Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Translation Test)');
     const stubResponse: RawTranslationResult = {
       markdown: '**Hello** <script>alert(1)</script>',
       providerId: 'stub-provider',
@@ -395,7 +395,7 @@ suite('TranslationService', () => {
   });
 
   test('emits placeholder content when translation fails without cache', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Translation Error Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Translation Error Test)');
     let attemptCount = 0;
     const client: Partial<OpenAITranslationClient> = {
       translate: async (): Promise<RawTranslationResult> => {
@@ -446,7 +446,7 @@ suite('TranslationService', () => {
   });
 
   test('strips wrapping markdown fences from provider response', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Fence Strip Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Fence Strip Test)');
     const client: Partial<OpenAITranslationClient> = {
       translate: async (): Promise<RawTranslationResult> => ({
         markdown: '```markdown\n## Translated Heading\n```',
@@ -475,7 +475,7 @@ suite('TranslationService', () => {
   });
 
   test('strips wrapping fences when served from segment cache', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Fence Cache Strip Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Fence Cache Strip Test)');
     const cache = new TranslationCache({ ttlMs: 1000 });
     const client: Partial<OpenAITranslationClient> = {
       translate: async (): Promise<RawTranslationResult> => {
@@ -509,7 +509,7 @@ suite('TranslationService', () => {
   });
 
   test('preserves code fences when source segment is a code block', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Fence Preserve Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Fence Preserve Test)');
     const client: Partial<OpenAITranslationClient> = {
       translate: async (): Promise<RawTranslationResult> => ({
         markdown: '```typescript\nconst value = 1;\n```',
@@ -537,7 +537,7 @@ suite('TranslationService', () => {
   });
 
   test('raises structured error on authentication failure', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Auth Error Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Auth Error Test)');
     const client: Partial<OpenAITranslationClient> = {
       translate: async (): Promise<RawTranslationResult> => {
         throw new TranslationProviderError('Unauthorized', {
@@ -571,7 +571,7 @@ suite('TranslationService', () => {
   });
 
   test('invokes segment handler for each translated paragraph', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Translation Segments Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Translation Segments Test)');
     let callCount = 0;
     const client: Partial<OpenAITranslationClient> = {
       translate: async ({ documentText }: TranslateRequest): Promise<RawTranslationResult> => {
@@ -617,7 +617,7 @@ suite('TranslationService', () => {
   });
 
   test('adaptive batching merges short segments when enabled', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Adaptive Segments Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Adaptive Segments Test)');
     let callCount = 0;
     const translatedSegments: string[] = [];
     const client: Partial<OpenAITranslationClient> = {
@@ -671,7 +671,7 @@ suite('TranslationService', () => {
   });
 
   test('parallel scheduler preserves segment order', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Parallel Order Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Parallel Order Test)');
     const callOrder: number[] = [];
     const emissionOrder: number[] = [];
 
@@ -740,7 +740,7 @@ suite('TranslationService', () => {
   });
 
   test('parallel scheduler falls back to serial on failure when enabled', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Parallel Fallback Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Parallel Fallback Test)');
     const failureCounts = new Map<number, number>();
     const segmentUpdates = new Map<number, string>();
 
@@ -801,7 +801,7 @@ suite('TranslationService', () => {
   });
 
   test('segment cache prevents repeated provider calls', async () => {
-    const logger = new ExtensionLogger('Babel MD Viewer (Segment Cache Test)');
+  const logger = new ExtensionLogger('Babel Markdown (Segment Cache Test)');
     const cache = new TranslationCache({ ttlMs: 1000 });
     let callCount = 0;
 

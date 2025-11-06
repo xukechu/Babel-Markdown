@@ -36,8 +36,8 @@ const translations = {
     'zh-cn': '翻译预览仅适用于 Markdown 文件。',
   },
   'command.openTranslation.missingKey': {
-    en: 'Translation API key not set. Run "Babel MD Viewer: Set Translation API Key" first.',
-    'zh-cn': '尚未设置翻译 API 密钥。请先运行“Babel MD Viewer: 设置翻译 API 密钥”。',
+    en: 'Translation API key not set. Run "Babel Markdown: Set Translation API Key" first.',
+    'zh-cn': '尚未设置翻译 API 密钥。请先运行“Babel Markdown：设置翻译 API 密钥”。',
   },
   'command.openTranslation.failure': {
     en: 'Unable to open translation preview. Check logs for details.',
