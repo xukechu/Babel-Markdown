@@ -52,6 +52,10 @@ export class TranslationPreviewManager implements vscode.Disposable {
         const key = document.uri.toString();
         const preview = this.previews.get(key);
         if (preview) {
+          this.cancelPendingTranslation(key, 'source-document-closed', {
+            documentPath: this.getDocumentLabel(document),
+            targetLanguage: preview.context.resolvedConfig.targetLanguage,
+          });
           this.logger.info(`Closing translation preview for ${key} (source document closed).`);
           preview.panel.dispose();
         }
@@ -133,14 +137,15 @@ export class TranslationPreviewManager implements vscode.Disposable {
     const disposable = panel.onDidDispose(() => {
       this.logger.info(`Translation preview disposed for ${key}.`);
       const entry = this.previews.get(key);
+      if (entry) {
+        this.cancelPendingTranslation(key, 'preview-closed', {
+          documentPath: this.getDocumentLabel(entry.context.document),
+          targetLanguage: entry.context.resolvedConfig.targetLanguage,
+        });
+      }
       entry?.rangeSubscription?.dispose();
       this.previews.delete(key);
       disposable.dispose();
-      const controller = this.abortControllers.get(key);
-      if (controller) {
-        controller.abort();
-        this.abortControllers.delete(key);
-      }
     });
 
     const entry: PreviewEntry = {
@@ -241,10 +246,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
     this.logger.event('translation.fetchStarted', requestMeta);
 
     const controller = new AbortController();
-    const previousController = this.abortControllers.get(key);
-    if (previousController) {
-      previousController.abort();
-    }
+    this.cancelPendingTranslation(key, 'superseded');
     this.abortControllers.set(key, controller);
 
     this.postMessage(panel, {
@@ -727,5 +729,32 @@ export class TranslationPreviewManager implements vscode.Disposable {
     const position = new vscode.Position(targetLine, 0);
     const range = new vscode.Range(position, position);
     editor.revealRange(range, vscode.TextEditorRevealType.AtTop);
+  }
+
+  private cancelPendingTranslation(
+    key: string,
+    reason: 'source-document-closed' | 'preview-closed' | 'superseded',
+    meta?: { documentPath: string; targetLanguage: string },
+  ): void {
+    const controller = this.abortControllers.get(key);
+
+    if (!controller) {
+      return;
+    }
+
+    if (!controller.signal.aborted) {
+      this.logger.info(`Cancelling translation for ${key} (${reason}).`);
+
+      if (meta) {
+        this.logger.event('translation.cancelPending', {
+          documentPath: meta.documentPath,
+          targetLanguage: meta.targetLanguage,
+          reason,
+        });
+      }
+    }
+
+    controller.abort();
+    this.abortControllers.delete(key);
   }
 }
