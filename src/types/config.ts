@@ -4,6 +4,8 @@ export interface TranslationConfiguration {
   model: string;
   targetLanguage: string;
   timeoutMs: number;
+  adaptiveBatchingEnabled: boolean;
+  segmentMetricsLoggingEnabled: boolean;
 }
 
 export interface ExtensionConfiguration {

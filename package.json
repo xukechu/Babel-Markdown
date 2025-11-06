@@ -116,6 +116,16 @@
           "default": 30000,
           "minimum": 1000,
           "markdownDescription": "%config.translation.timeoutMs.markdownDescription%"
+        },
+        "babelMdViewer.translation.enableAdaptiveBatching": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%config.translation.enableAdaptiveBatching.markdownDescription%"
+        },
+        "babelMdViewer.translation.logSegmentMetrics": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%config.translation.logSegmentMetrics.markdownDescription%"
         }
       }
     }

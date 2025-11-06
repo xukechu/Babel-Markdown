@@ -82,6 +82,16 @@ suite('Configuration Helper', () => {
       originalConfig?.timeoutMs,
       vscode.ConfigurationTarget.Workspace,
     );
+    await configuration.update(
+      'translation.enableAdaptiveBatching',
+      originalConfig?.adaptiveBatchingEnabled,
+      vscode.ConfigurationTarget.Workspace,
+    );
+    await configuration.update(
+      'translation.logSegmentMetrics',
+      originalConfig?.segmentMetricsLoggingEnabled,
+      vscode.ConfigurationTarget.Workspace,
+    );
   });
 
   test('reads translation configuration with overrides', async () => {
@@ -112,6 +122,16 @@ suite('Configuration Helper', () => {
       45000,
       vscode.ConfigurationTarget.Workspace,
     );
+    await configuration.update(
+      'translation.enableAdaptiveBatching',
+      true,
+      vscode.ConfigurationTarget.Workspace,
+    );
+    await configuration.update(
+      'translation.logSegmentMetrics',
+      true,
+      vscode.ConfigurationTarget.Workspace,
+    );
 
     const result = getExtensionConfiguration();
 
@@ -120,6 +140,8 @@ suite('Configuration Helper', () => {
     assert.strictEqual(result.translation.model, 'gpt-test');
     assert.strictEqual(result.translation.targetLanguage, 'fr');
     assert.strictEqual(result.translation.timeoutMs, 45000);
+    assert.strictEqual(result.translation.adaptiveBatchingEnabled, true);
+    assert.strictEqual(result.translation.segmentMetricsLoggingEnabled, true);
   });
 });
 
@@ -256,6 +278,8 @@ suite('TranslationService', () => {
       model: 'gpt-test',
       targetLanguage: 'de',
       timeoutMs: 1000,
+      adaptiveBatchingEnabled: false,
+      segmentMetricsLoggingEnabled: false,
     },
   };
 
@@ -368,6 +392,60 @@ suite('TranslationService', () => {
     ]);
     assert.ok(result.markdown.includes('translated: First paragraph.'));
     assert.ok(result.markdown.includes('translated: Second paragraph.\nStill second.'));
+
+    logger.dispose();
+  });
+
+  test('adaptive batching merges short segments when enabled', async () => {
+    const logger = new ExtensionLogger('Babel MD Viewer (Adaptive Segments Test)');
+    let callCount = 0;
+    const translatedSegments: string[] = [];
+    const client: Partial<OpenAITranslationClient> = {
+      translate: async ({ documentText }: TranslateRequest): Promise<RawTranslationResult> => {
+        callCount += 1;
+        translatedSegments.push(documentText);
+        return {
+          markdown: `translated: ${documentText}`,
+          providerId: 'stub-provider',
+          latencyMs: 7,
+        };
+      },
+    };
+
+    const adaptiveConfiguration: ExtensionConfiguration = {
+      ...configuration,
+      translation: {
+        ...configuration.translation,
+        adaptiveBatchingEnabled: true,
+      },
+    };
+
+    const service = new TranslationService(logger, client as OpenAITranslationClient);
+    const document = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Short one.\n\nShort two.\n\nShort three.',
+    });
+
+    const segments: Array<{ index: number; total: number }> = [];
+
+    const result = await service.translateDocument(
+      {
+        document,
+        configuration: adaptiveConfiguration,
+        resolvedConfig,
+      },
+      {
+        onSegment: (update) => {
+          segments.push({ index: update.segmentIndex, total: update.totalSegments });
+        },
+      },
+    );
+
+    assert.strictEqual(callCount, 1);
+    assert.deepStrictEqual(segments, [{ index: 0, total: 1 }]);
+    assert.ok(result.markdown.includes('translated: Short one.'));
+    assert.ok(result.markdown.includes('Short three.'));
+    assert.strictEqual(translatedSegments[0].includes('Short two.'), true);
 
     logger.dispose();
   });

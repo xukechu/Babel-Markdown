@@ -32,6 +32,9 @@ export interface TranslationHandlers {
 }
 
 export class TranslationService {
+  private static readonly ADAPTIVE_TARGET_LENGTH = 500;
+  private static readonly ADAPTIVE_MAX_LENGTH = 1400;
+
   constructor(
     private readonly logger: ExtensionLogger,
     private readonly openAIClient: OpenAITranslationClient,
@@ -61,7 +64,23 @@ export class TranslationService {
       });
     }
 
-    const segments = this.splitIntoSegments(text);
+    const plan = this.planSegments(text, {
+      adaptive: context.configuration.translation.adaptiveBatchingEnabled,
+    });
+    const segments = plan.segments;
+
+    if (context.configuration.translation.segmentMetricsLoggingEnabled) {
+      this.logger.event('translation.segmentPlan', {
+        documentPath: relativePath,
+        totalSegments: plan.metrics.totalSegments,
+        averageLength: plan.metrics.averageLength,
+        minLength: plan.metrics.minLength,
+        maxLength: plan.metrics.maxLength,
+        strategy: plan.strategy,
+        documentCharacters: plan.metrics.documentCharacters,
+        baseSegments: plan.metrics.baseSegments,
+      });
+    }
 
     if (segments.length === 0) {
       return this.composeResult({
@@ -167,5 +186,84 @@ export class TranslationService {
     }
 
     return segments;
+  }
+
+  private planSegments(
+    markdown: string,
+    options: { adaptive: boolean },
+  ): {
+    segments: string[];
+    strategy: 'basic' | 'adaptive';
+    metrics: {
+      totalSegments: number;
+      averageLength: number;
+      minLength: number;
+      maxLength: number;
+      documentCharacters: number;
+      baseSegments: number;
+    };
+  } {
+    const baseSegments = this.splitIntoSegments(markdown);
+    const strategy = options.adaptive ? 'adaptive' : 'basic';
+    const segments = options.adaptive ? this.mergeSegments(baseSegments) : baseSegments;
+    const lengths = segments.map((segment) => segment.length);
+    const metrics = {
+      totalSegments: segments.length,
+      averageLength: lengths.length > 0 ? lengths.reduce((acc, value) => acc + value, 0) / lengths.length : 0,
+      minLength: lengths.length > 0 ? Math.min(...lengths) : 0,
+      maxLength: lengths.length > 0 ? Math.max(...lengths) : 0,
+      documentCharacters: markdown.length,
+      baseSegments: baseSegments.length,
+    };
+
+    return { segments, strategy, metrics };
+  }
+
+  private mergeSegments(segments: string[]): string[] {
+    const merged: string[] = [];
+    let buffer = '';
+
+    const pushBuffer = () => {
+      if (buffer.trim().length > 0) {
+        merged.push(buffer);
+      }
+      buffer = '';
+    };
+
+    for (const segment of segments) {
+      const trimmedBuffer = buffer.trim();
+      const trimmedSegment = segment.trim();
+
+      if (!trimmedBuffer) {
+        buffer = segment;
+        if (segment.length >= TranslationService.ADAPTIVE_TARGET_LENGTH) {
+          pushBuffer();
+        }
+        continue;
+      }
+
+      const candidate = `${buffer}\n\n${segment}`;
+
+      if (candidate.length > TranslationService.ADAPTIVE_MAX_LENGTH) {
+        pushBuffer();
+        buffer = segment;
+        if (segment.length >= TranslationService.ADAPTIVE_TARGET_LENGTH || segment.length > TranslationService.ADAPTIVE_MAX_LENGTH) {
+          pushBuffer();
+        }
+        continue;
+      }
+
+      if (candidate.length >= TranslationService.ADAPTIVE_TARGET_LENGTH || trimmedSegment.length === 0) {
+        buffer = candidate;
+        pushBuffer();
+        continue;
+      }
+
+      buffer = candidate;
+    }
+
+    pushBuffer();
+
+    return merged.length > 0 ? merged : segments;
   }
 }

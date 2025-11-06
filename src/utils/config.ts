@@ -17,6 +17,8 @@ export function getExtensionConfiguration(
       model: configuration.get<string>('translation.model', 'gpt-4o-mini'),
       targetLanguage: configuration.get<string>('translation.targetLanguage', 'en'),
       timeoutMs: configuration.get<number>('translation.timeoutMs', 30000),
+      adaptiveBatchingEnabled: configuration.get<boolean>('translation.enableAdaptiveBatching', false),
+      segmentMetricsLoggingEnabled: configuration.get<boolean>('translation.logSegmentMetrics', false),
     },
   };
 }

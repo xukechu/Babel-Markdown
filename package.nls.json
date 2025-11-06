@@ -14,5 +14,7 @@
   "config.translation.apiKey.markdownDescription": "API key used for translation calls. Stored securely via command palette when possible; avoid committing plain text values.",
   "config.translation.model.markdownDescription": "Model identifier used for translation requests.",
   "config.translation.targetLanguage.markdownDescription": "Target language for translated Markdown output (e.g., `en`, `zh-CN`).",
-  "config.translation.timeoutMs.markdownDescription": "Timeout (in milliseconds) for translation API requests."
+  "config.translation.timeoutMs.markdownDescription": "Timeout (in milliseconds) for translation API requests.",
+  "config.translation.enableAdaptiveBatching.markdownDescription": "Merge shorter segments together before translation to reduce request overhead. Experimental feature.",
+  "config.translation.logSegmentMetrics.markdownDescription": "Log segment planning metrics to the output channel for diagnostics."
 }
