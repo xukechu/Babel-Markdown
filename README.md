@@ -1,6 +1,6 @@
 # Babel Markdown
 
-![Babel Markdown 功能预览](https://raw.githubusercontent.com/xukechu/Babel-Markdown/refs/heads/main/assets/images/%E5%8A%9F%E8%83%BD%E5%AE%A3%E4%BC%A0.png)
+![Babel Markdown 功能预览](https://raw.githubusercontent.com/xukechu/Babel-Markdown/refs/heads/main/assets/images/Snipaste_2025-11-06_18-16-02.png)
 
 Babel Markdown 为 VS Code 提供实时翻译预览能力，让原文 Markdown 与 AI 翻译后的内容在同一视图中同步呈现，帮助你高效校对多语言文档。
 
