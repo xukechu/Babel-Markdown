@@ -85,6 +85,20 @@ export class TranslationRunError extends Error {
 export class TranslationService {
   private static readonly ADAPTIVE_TARGET_LENGTH = 500;
   private static readonly ADAPTIVE_MAX_LENGTH = 1400;
+  private static readonly WRAPPED_MARKDOWN_LANGUAGES = new Set([
+    '',
+    'markdown',
+    'md',
+    'mdx',
+    'commonmark',
+    'gfm',
+    'github-flavored-markdown',
+    'plain',
+    'plaintext',
+    'text',
+    'txt',
+    'none',
+  ]);
 
   constructor(
     private readonly logger: ExtensionLogger,
@@ -392,10 +406,20 @@ export class TranslationService {
           continue;
         }
 
+        const normalizedCachedMarkdown = this.normalizeSegmentTranslation(segment, cached.markdown);
+
+        if (normalizedCachedMarkdown !== cached.markdown) {
+          context.cache?.setSegment(context.document, context.resolvedConfig, segment, {
+            markdown: normalizedCachedMarkdown,
+            providerId: cached.providerId,
+            latencyMs: cached.latencyMs,
+          });
+        }
+
         cachedIndices.add(index);
         pending.set(index, {
-          markdown: cached.markdown,
-          html: renderMarkdownToHtml(cached.markdown),
+          markdown: normalizedCachedMarkdown,
+          html: renderMarkdownToHtml(normalizedCachedMarkdown),
           latencyMs: cached.latencyMs,
           providerId: cached.providerId,
           wasCached: true,
@@ -593,9 +617,14 @@ export class TranslationService {
           signal: context.signal,
         });
 
+        const normalizedResult: RawTranslationResult = {
+          ...result,
+          markdown: this.normalizeSegmentTranslation(segmentMarkdown, result.markdown),
+        };
+
         return {
           kind: 'success',
-          result,
+          result: normalizedResult,
           shouldCache: true,
         };
       } catch (error) {
@@ -753,9 +782,19 @@ export class TranslationService {
         errorCode: error.code,
       });
 
+      const normalizedMarkdown = this.normalizeSegmentTranslation(segmentMarkdown, cached.markdown);
+
+      if (normalizedMarkdown !== cached.markdown) {
+        context.cache?.setSegment(context.document, context.resolvedConfig, segmentMarkdown, {
+          markdown: normalizedMarkdown,
+          providerId: cached.providerId,
+          latencyMs: cached.latencyMs,
+        });
+      }
+
       return {
         result: {
-          markdown: cached.markdown,
+          markdown: normalizedMarkdown,
           providerId: cached.providerId,
           latencyMs: cached.latencyMs,
         },
@@ -810,6 +849,76 @@ export class TranslationService {
     const header = headerLines.join('\n');
     const body = segmentMarkdown.trim().length > 0 ? `\n\n${segmentMarkdown}` : '';
     return `${header}${body}`;
+  }
+
+  private normalizeSegmentTranslation(segmentMarkdown: string, translatedMarkdown: string): string {
+    if (!translatedMarkdown) {
+      return translatedMarkdown;
+    }
+
+    const trimmedResponse = translatedMarkdown.trim();
+
+    if (!trimmedResponse.startsWith('```')) {
+      return translatedMarkdown;
+    }
+
+    const lines = trimmedResponse.split(/\r?\n/);
+    if (lines.length < 3) {
+      return translatedMarkdown;
+    }
+
+    const opening = lines[0];
+    if (!opening.startsWith('```')) {
+      return translatedMarkdown;
+    }
+
+    const closing = lines[lines.length - 1].trim();
+    if (!/^```(?:\s*)$/.test(closing)) {
+      return translatedMarkdown;
+    }
+
+    const languageIdentifier = opening.slice(3).trim().toLowerCase();
+    const normalizedLanguage = languageIdentifier.replace(/[^a-z0-9-]/g, '');
+    const body = lines.slice(1, -1).join('\n');
+    const sourceTrimmed = segmentMarkdown.trim();
+
+    if (this.isStandaloneCodeFence(sourceTrimmed)) {
+      return translatedMarkdown;
+    }
+
+    const shouldUnwrap =
+      TranslationService.WRAPPED_MARKDOWN_LANGUAGES.has(normalizedLanguage) ||
+      normalizedLanguage.startsWith('md-') ||
+      normalizedLanguage.includes('markdown') ||
+      normalizedLanguage.includes('commonmark') ||
+      normalizedLanguage.includes('gfm');
+
+    if (shouldUnwrap) {
+      return body;
+    }
+
+    return translatedMarkdown;
+  }
+
+  private isStandaloneCodeFence(markdown: string): boolean {
+    if (!markdown) {
+      return false;
+    }
+
+    const trimmed = markdown.trim();
+
+    if (!trimmed.startsWith('```') || !trimmed.endsWith('```')) {
+      return false;
+    }
+
+    const lines = trimmed.split(/\r?\n/);
+
+    if (lines.length < 3) {
+      return false;
+    }
+
+    const closing = lines[lines.length - 1].trim();
+    return /^```(?:\s*)$/.test(closing);
   }
 
   private sanitizeErrorMessage(message: string): string {

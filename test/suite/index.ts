@@ -445,6 +445,97 @@ suite('TranslationService', () => {
     logger.dispose();
   });
 
+  test('strips wrapping markdown fences from provider response', async () => {
+    const logger = new ExtensionLogger('Babel MD Viewer (Fence Strip Test)');
+    const client: Partial<OpenAITranslationClient> = {
+      translate: async (): Promise<RawTranslationResult> => ({
+        markdown: '```markdown\n## Translated Heading\n```',
+        providerId: 'stub-provider',
+        latencyMs: 8,
+      }),
+    };
+
+    const service = new TranslationService(logger, client as OpenAITranslationClient);
+    const document = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '## Heading',
+    });
+
+    const result = await service.translateDocument({
+      document,
+      configuration,
+      resolvedConfig,
+      cache: new TranslationCache(),
+    });
+
+    assert.strictEqual(result.markdown, '## Translated Heading');
+    assert.strictEqual(result.html.includes('<code'), false);
+
+    logger.dispose();
+  });
+
+  test('strips wrapping fences when served from segment cache', async () => {
+    const logger = new ExtensionLogger('Babel MD Viewer (Fence Cache Strip Test)');
+    const cache = new TranslationCache({ ttlMs: 1000 });
+    const client: Partial<OpenAITranslationClient> = {
+      translate: async (): Promise<RawTranslationResult> => {
+        throw new Error('should not call provider when cache hit');
+      },
+    };
+
+    const service = new TranslationService(logger, client as OpenAITranslationClient);
+    const document = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Paragraph to translate.',
+    });
+
+    cache.setSegment(document, resolvedConfig, 'Paragraph to translate.', {
+      markdown: '```markdown\ncached translation\n```',
+      providerId: 'cached-provider',
+      latencyMs: 3,
+    });
+
+    const result = await service.translateDocument({
+      document,
+      configuration,
+      resolvedConfig,
+      cache,
+    });
+
+    assert.strictEqual(result.markdown, 'cached translation');
+    assert.strictEqual(result.html.includes('<code'), false);
+
+    logger.dispose();
+  });
+
+  test('preserves code fences when source segment is a code block', async () => {
+    const logger = new ExtensionLogger('Babel MD Viewer (Fence Preserve Test)');
+    const client: Partial<OpenAITranslationClient> = {
+      translate: async (): Promise<RawTranslationResult> => ({
+        markdown: '```typescript\nconst value = 1;\n```',
+        providerId: 'stub-provider',
+        latencyMs: 5,
+      }),
+    };
+
+    const service = new TranslationService(logger, client as OpenAITranslationClient);
+    const document = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '```ts\nconst value = 1;\n```',
+    });
+
+    const result = await service.translateDocument({
+      document,
+      configuration,
+      resolvedConfig,
+    });
+
+    assert.strictEqual(result.markdown.trim(), '```typescript\nconst value = 1;\n```');
+    assert.strictEqual(result.html.includes('<code'), true);
+
+    logger.dispose();
+  });
+
   test('raises structured error on authentication failure', async () => {
     const logger = new ExtensionLogger('Babel MD Viewer (Auth Error Test)');
     const client: Partial<OpenAITranslationClient> = {
