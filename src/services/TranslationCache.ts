@@ -50,8 +50,9 @@ export class TranslationCache {
   get(
     document: DocumentLike,
     resolvedConfig: ResolvedTranslationConfiguration,
+    promptFingerprint: string,
   ): TranslationResult | undefined {
-    const key = this.buildKey(document, resolvedConfig);
+    const key = this.buildKey(document, resolvedConfig, promptFingerprint);
     const entry = this.cache.get(key);
 
     if (!entry) {
@@ -69,9 +70,10 @@ export class TranslationCache {
   set(
     document: DocumentLike,
     resolvedConfig: ResolvedTranslationConfiguration,
+    promptFingerprint: string,
     result: TranslationResult,
   ): void {
-    const key = this.buildKey(document, resolvedConfig);
+    const key = this.buildKey(document, resolvedConfig, promptFingerprint);
 
     if (this.cache.size >= this.maxEntries) {
       this.evictOne();
@@ -117,8 +119,13 @@ export class TranslationCache {
     document: DocumentLike,
     resolvedConfig: ResolvedTranslationConfiguration,
     segmentMarkdown: string,
+    promptFingerprint: string,
   ): CachedSegmentResult | undefined {
-    const fingerprint = this.buildSegmentFingerprint(resolvedConfig, segmentMarkdown);
+    const fingerprint = this.buildSegmentFingerprint(
+      resolvedConfig,
+      segmentMarkdown,
+      promptFingerprint,
+    );
     const entry = this.segmentCache.get(fingerprint);
 
     if (!entry) {
@@ -145,9 +152,14 @@ export class TranslationCache {
     document: DocumentLike,
     resolvedConfig: ResolvedTranslationConfiguration,
     segmentMarkdown: string,
+    promptFingerprint: string,
     result: RawTranslationResult,
   ): void {
-    const fingerprint = this.buildSegmentFingerprint(resolvedConfig, segmentMarkdown);
+    const fingerprint = this.buildSegmentFingerprint(
+      resolvedConfig,
+      segmentMarkdown,
+      promptFingerprint,
+    );
 
     this.segmentCache.set(fingerprint, {
       key: { fingerprint },
@@ -162,11 +174,13 @@ export class TranslationCache {
   private buildKey(
     document: DocumentLike,
     resolvedConfig: ResolvedTranslationConfiguration,
+    promptFingerprint: string,
   ): string {
     const configHash = hashObject({
       apiBaseUrl: resolvedConfig.apiBaseUrl,
       model: resolvedConfig.model,
       targetLanguage: resolvedConfig.targetLanguage,
+      prompt: promptFingerprint,
     });
 
     return `${document.uri.toString()}::${document.version}::${configHash}`;
@@ -175,6 +189,7 @@ export class TranslationCache {
   private buildSegmentFingerprint(
     resolvedConfig: ResolvedTranslationConfiguration,
     segmentMarkdown: string,
+    promptFingerprint: string,
   ): string {
     const normalized = segmentMarkdown.replace(/\r\n/g, '\n').trim();
 
@@ -183,6 +198,7 @@ export class TranslationCache {
       model: resolvedConfig.model,
       targetLanguage: resolvedConfig.targetLanguage,
       apiBaseUrl: resolvedConfig.apiBaseUrl,
+      prompt: promptFingerprint,
     });
   }
 

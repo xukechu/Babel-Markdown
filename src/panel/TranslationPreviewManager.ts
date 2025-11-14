@@ -4,6 +4,7 @@ import type { ExtensionConfiguration } from '../types/config';
 import type { ResolvedTranslationConfiguration } from '../types/translation';
 import { TranslationService, TranslationSegmentUpdate } from '../services/TranslationService';
 import { TranslationCache } from '../services/TranslationCache';
+import { PromptResolver } from '../services/PromptResolver';
 import type { HostToWebviewMessage, WebviewToHostMessage } from '../messaging/channel';
 import { getWebviewLocaleBundle, localize } from '../i18n/localize';
 import { ExtensionLogger } from '../utils/logger';
@@ -46,6 +47,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly translationService: TranslationService,
+    private readonly promptResolver: PromptResolver,
     private readonly logger: ExtensionLogger,
   ) {
     this.disposables.push(
@@ -191,7 +193,14 @@ export class TranslationPreviewManager implements vscode.Disposable {
     preview.context = context;
 
     const documentPath = this.getDocumentLabel(context.document);
-    const requestMeta = {
+    let requestMeta: {
+      documentPath: string;
+      targetLanguage: string;
+      version: number;
+      force: boolean;
+      invalidateCache: boolean;
+      promptSource?: string;
+    } = {
       documentPath,
       targetLanguage: context.resolvedConfig.targetLanguage,
       version: context.document.version,
@@ -207,6 +216,18 @@ export class TranslationPreviewManager implements vscode.Disposable {
       return;
     }
 
+    const prompt = await this.promptResolver.resolve(context.document, context.configuration);
+    requestMeta = {
+      ...requestMeta,
+      promptSource: prompt.source,
+    };
+
+    if (prompt.source === 'workspace' && prompt.uri) {
+      this.logger.info(`Using workspace translation prompt from ${prompt.uri.fsPath}.`);
+    } else if (prompt.source === 'configuration') {
+      this.logger.info('Using translation prompt from user settings.');
+    }
+
     this.logger.event('translation.requested', requestMeta);
 
     preview.lastVersion = context.document.version;
@@ -215,7 +236,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
       this.cache.clearForDocument(context.document);
     }
 
-    const cached = this.cache.get(context.document, context.resolvedConfig);
+    const cached = this.cache.get(context.document, context.resolvedConfig, prompt.fingerprint);
 
     if (cached) {
       this.logger.info(`Serving translation for ${key} from cache.`);
@@ -324,6 +345,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
           resolvedConfig: context.resolvedConfig,
           signal: controller.signal,
           cache: this.cache,
+          prompt,
         },
         { onPlan, onSegment },
       );
@@ -360,7 +382,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
         },
       });
       if (shouldPersistDocumentCache) {
-        this.cache.set(context.document, context.resolvedConfig, result);
+        this.cache.set(context.document, context.resolvedConfig, prompt.fingerprint, result);
       } else {
         this.logger.info(
           `Skipped document-level cache for ${documentPath} due to segment recoveries.`,

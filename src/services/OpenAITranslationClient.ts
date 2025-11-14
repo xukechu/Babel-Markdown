@@ -4,13 +4,16 @@ import type {
   RawTranslationResult,
   ResolvedTranslationConfiguration,
   TranslationErrorCode,
+  TranslationPrompt,
 } from '../types/translation';
 import { ExtensionLogger } from '../utils/logger';
 
 export interface TranslateRequest {
   documentText: string;
   fileName: string;
+  documentLabel: string;
   resolvedConfig: ResolvedTranslationConfiguration;
+  prompt: TranslationPrompt;
   signal?: AbortSignal;
 }
 
@@ -65,9 +68,17 @@ export class OpenAITranslationClient {
   constructor(private readonly logger: ExtensionLogger) {}
 
   async translate(request: TranslateRequest): Promise<RawTranslationResult> {
-  const { resolvedConfig, documentText, fileName, signal } = request;
-  const url = this.buildEndpointUrl(resolvedConfig.apiBaseUrl);
-    const prompt = this.buildPrompt(documentText, resolvedConfig.targetLanguage, fileName);
+    const { resolvedConfig, documentText, fileName, documentLabel, prompt, signal } = request;
+    const url = this.buildEndpointUrl(resolvedConfig.apiBaseUrl);
+    const instructions = this.interpolateInstructions(prompt.instructions, {
+      targetLanguage: resolvedConfig.targetLanguage,
+      fileName: documentLabel,
+    });
+    const messages = this.buildPrompt({
+      instructions,
+      markdown: documentText,
+      fileName,
+    });
 
     const controller = new AbortController();
     let timeoutId: NodeJS.Timeout | undefined;
@@ -100,7 +111,7 @@ export class OpenAITranslationClient {
         },
         body: JSON.stringify({
           model: resolvedConfig.model,
-          messages: prompt,
+          messages,
           temperature: 0.2,
           top_p: 1,
           response_format: { type: 'text' },
@@ -188,19 +199,17 @@ export class OpenAITranslationClient {
     }
   }
 
-  private buildPrompt(
-    markdown: string,
-    targetLanguage: string,
-    fileName: string,
-  ): Array<{ role: 'system' | 'user'; content: string }> {
-    const systemPrompt = `You are an expert technical translator. Translate Markdown documents into ${targetLanguage} while preserving the original Markdown structure, code blocks, inline formatting, tables, and metadata. Do not add commentary.`;
+  private buildPrompt(params: {
+    instructions: string;
+    markdown: string;
+    fileName: string;
+  }): Array<{ role: 'system' | 'user'; content: string }> {
+    const userPrompt = `Translate the following Markdown file (${params.fileName}). Respond only with translated Markdown.
 
-    const userPrompt = `Translate the following Markdown file (${fileName}). Respond only with translated Markdown.
-
-${markdown}`;
+${params.markdown}`;
 
     return [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: params.instructions.trim() },
       { role: 'user', content: userPrompt },
     ];
   }
@@ -222,6 +231,19 @@ ${markdown}`;
       this.logger.warn('Failed to read error response body.');
       return undefined;
     }
+  }
+
+  private interpolateInstructions(
+    template: string,
+    values: { targetLanguage: string; fileName: string },
+  ): string {
+    const replace = (needle: string, replacement: string): ((value: string) => string) => {
+      const pattern = new RegExp(`{{\\s*${needle}\\s*}}`, 'gi');
+      return (value: string) => value.replace(pattern, () => replacement);
+    };
+
+    const withTargetLanguage = replace('targetLanguage', values.targetLanguage)(template);
+    return replace('fileName', values.fileName)(withTargetLanguage).trim();
   }
 
   private normalizeError(error: Error): TranslationProviderError {

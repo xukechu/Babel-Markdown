@@ -19,5 +19,6 @@
   "config.translation.logSegmentMetrics.markdownDescription": "Log segment planning metrics to the output channel for diagnostics.",
   "config.translation.concurrencyLimit.markdownDescription": "Maximum number of translation requests executed in parallel (requires experimental scheduler).",
   "config.translation.parallelFallbackEnabled.markdownDescription": "Retry the translation serially if a parallel attempt fails.",
+  "config.translation.promptTemplate.markdownDescription": "Custom translation prompt instructions. Supports {{targetLanguage}} and {{fileName}} placeholders. Use a workspace-level .babelmd/translation-prompt.md file to override per project.",
   "config.translation.retry.maxAttempts.markdownDescription": "Maximum number of attempts to translate a segment before giving up (includes the first attempt)."
 }

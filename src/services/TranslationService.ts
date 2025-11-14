@@ -7,6 +7,7 @@ import type {
   TranslationResult,
   TranslationRecovery,
   TranslationErrorCode,
+  TranslationPrompt,
 } from '../types/translation';
 import { OpenAITranslationClient, TranslationProviderError } from './OpenAITranslationClient';
 import { TranslationCache } from './TranslationCache';
@@ -18,6 +19,7 @@ export interface TranslationRequestContext {
   document: vscode.TextDocument;
   configuration: ExtensionConfiguration;
   resolvedConfig: ResolvedTranslationConfiguration;
+  prompt: TranslationPrompt;
   signal?: AbortSignal;
   cache?: TranslationCache;
 }
@@ -112,7 +114,7 @@ export class TranslationService {
     const relativePath = vscode.workspace.asRelativePath(context.document.uri);
 
     this.logger.info(
-      `Translating ${relativePath} to ${context.resolvedConfig.targetLanguage} with model ${context.resolvedConfig.model}.`,
+      `Translating ${relativePath} to ${context.resolvedConfig.targetLanguage} with model ${context.resolvedConfig.model} (prompt source: ${context.prompt.source}).`,
     );
 
     if (context.signal?.aborted) {
@@ -151,6 +153,7 @@ export class TranslationService {
         concurrencyLimit,
         parallelEnabled: concurrencyLimit > 1,
         parallelFallbackEnabled: context.configuration.translation.parallelismFallbackEnabled,
+        promptSource: context.prompt.source,
       });
     }
 
@@ -396,11 +399,17 @@ export class TranslationService {
     const cachedIndices = new Set<number>();
     const recoveries: TranslationRecovery[] = [];
     let capturedError: { error: TranslationProviderError; index: number } | undefined;
+    const promptFingerprint = context.prompt.fingerprint;
 
     if (context.cache) {
       for (let index = 0; index < totalSegments; index += 1) {
         const segment = segments[index];
-        const cached = context.cache.getSegment(context.document, context.resolvedConfig, segment);
+        const cached = context.cache.getSegment(
+          context.document,
+          context.resolvedConfig,
+          segment,
+          promptFingerprint,
+        );
 
         if (!cached) {
           continue;
@@ -409,11 +418,17 @@ export class TranslationService {
         const normalizedCachedMarkdown = this.normalizeSegmentTranslation(segment, cached.markdown);
 
         if (normalizedCachedMarkdown !== cached.markdown) {
-          context.cache?.setSegment(context.document, context.resolvedConfig, segment, {
-            markdown: normalizedCachedMarkdown,
-            providerId: cached.providerId,
-            latencyMs: cached.latencyMs,
-          });
+          context.cache?.setSegment(
+            context.document,
+            context.resolvedConfig,
+            segment,
+            promptFingerprint,
+            {
+              markdown: normalizedCachedMarkdown,
+              providerId: cached.providerId,
+              latencyMs: cached.latencyMs,
+            },
+          );
         }
 
         cachedIndices.add(index);
@@ -529,6 +544,7 @@ export class TranslationService {
               context.document,
               context.resolvedConfig,
               segments[index],
+              promptFingerprint,
               outcome.result,
             );
           }
@@ -613,7 +629,9 @@ export class TranslationService {
         const result = await this.openAIClient.translate({
           documentText: segmentMarkdown,
           fileName: `${relativePath}#segment-${segmentIndex + 1}`,
+          documentLabel: relativePath,
           resolvedConfig: context.resolvedConfig,
+          prompt: context.prompt,
           signal: context.signal,
         });
 
@@ -767,6 +785,7 @@ export class TranslationService {
       context.document,
       context.resolvedConfig,
       segmentMarkdown,
+      context.prompt.fingerprint,
     );
 
     if (cached) {
@@ -785,11 +804,17 @@ export class TranslationService {
       const normalizedMarkdown = this.normalizeSegmentTranslation(segmentMarkdown, cached.markdown);
 
       if (normalizedMarkdown !== cached.markdown) {
-        context.cache?.setSegment(context.document, context.resolvedConfig, segmentMarkdown, {
-          markdown: normalizedMarkdown,
-          providerId: cached.providerId,
-          latencyMs: cached.latencyMs,
-        });
+        context.cache?.setSegment(
+          context.document,
+          context.resolvedConfig,
+          segmentMarkdown,
+          context.prompt.fingerprint,
+          {
+            markdown: normalizedMarkdown,
+            providerId: cached.providerId,
+            latencyMs: cached.latencyMs,
+          },
+        );
       }
 
       return {

@@ -9,6 +9,7 @@ export interface TranslationConfiguration {
   concurrencyLimit: number;
   parallelismFallbackEnabled: boolean;
   retryMaxAttempts: number;
+  promptTemplate: string;
 }
 
 export interface ExtensionConfiguration {

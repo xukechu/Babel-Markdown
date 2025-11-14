@@ -7,6 +7,14 @@ export type TranslationErrorCode =
   | 'invalidResponse'
   | 'unknown';
 
+export type TranslationPromptSource = 'default' | 'configuration' | 'workspace';
+
+export interface TranslationPrompt {
+  instructions: string;
+  source: TranslationPromptSource;
+  fingerprint: string;
+}
+
 export interface ResolvedTranslationConfiguration {
   apiBaseUrl: string;
   apiKey: string;

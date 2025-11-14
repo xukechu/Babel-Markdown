@@ -1,0 +1,1 @@
+export const DEFAULT_TRANSLATION_PROMPT = `You are an expert technical translator. Translate Markdown documents into {{targetLanguage}} while preserving the original Markdown structure, code blocks, inline formatting, tables, and metadata. Do not add commentary.`;

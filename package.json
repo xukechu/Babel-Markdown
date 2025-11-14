@@ -140,6 +140,11 @@
           "default": true,
           "markdownDescription": "%config.translation.parallelFallbackEnabled.markdownDescription%"
         },
+        "babelMdViewer.translation.promptTemplate": {
+          "type": "string",
+          "default": "You are an expert technical translator. Translate Markdown documents into {{targetLanguage}} while preserving the original Markdown structure, code blocks, inline formatting, tables, and metadata. Do not add commentary.",
+          "markdownDescription": "%config.translation.promptTemplate.markdownDescription%"
+        },
         "babelMdViewer.translation.retry.maxAttempts": {
           "type": "number",
           "default": 3,

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import type { ExtensionConfiguration } from '../types/config';
+import { DEFAULT_TRANSLATION_PROMPT } from '../constants/prompts';
 
 export function getExtensionConfiguration(
   scope?: vscode.ConfigurationScope,
@@ -22,6 +23,9 @@ export function getExtensionConfiguration(
       concurrencyLimit: configuration.get<number>('translation.concurrencyLimit', 2),
       parallelismFallbackEnabled: configuration.get<boolean>('translation.parallelFallbackEnabled', true),
       retryMaxAttempts: configuration.get<number>('translation.retry.maxAttempts', 3),
+      promptTemplate:
+        configuration.get<string>('translation.promptTemplate', DEFAULT_TRANSLATION_PROMPT).trim() ||
+        DEFAULT_TRANSLATION_PROMPT,
     },
   };
 }

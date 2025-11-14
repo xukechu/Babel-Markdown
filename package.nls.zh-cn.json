@@ -19,5 +19,6 @@
   "config.translation.logSegmentMetrics.markdownDescription": "将分段规划指标记录到输出面板，便于诊断。",
   "config.translation.concurrencyLimit.markdownDescription": "并行执行翻译请求的最大数量（实验性调度器功能）。",
   "config.translation.parallelFallbackEnabled.markdownDescription": "当并行翻译失败时自动回退到串行重试。",
+  "config.translation.promptTemplate.markdownDescription": "自定义翻译提示词，可使用 {{targetLanguage}} 和 {{fileName}} 占位符。也可以在项目根目录创建 .babelmd/translation-prompt.md 文件覆盖。",
   "config.translation.retry.maxAttempts.markdownDescription": "每个片段的最大翻译尝试次数（包含首次尝试），超过后视为失败。"
 }
