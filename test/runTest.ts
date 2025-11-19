@@ -8,10 +8,14 @@ async function main(): Promise<void> {
     const extensionTestsPath = path.resolve(__dirname, './suite/index');
     const workspacePath = path.resolve(__dirname, '..', '..');
 
+    if (process.env.ELECTRON_RUN_AS_NODE) {
+      delete process.env.ELECTRON_RUN_AS_NODE;
+    }
+
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: ['--disable-extensions', workspacePath],
+      launchArgs: [workspacePath],
     });
   } catch (error) {
     console.error('Failed to run extension tests');

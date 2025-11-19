@@ -10,7 +10,7 @@ const external = [
 
 export default defineConfig({
   ssr: {
-    noExternal: ['markdown-it', 'sanitize-html'],
+    noExternal: ['markdown-it', 'sanitize-html', 'pdf-lib'],
   },
   build: {
     ssr: true,
