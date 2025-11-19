@@ -19,7 +19,12 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onCommand:babelMdViewer.openPreview",
+    "onCommand:babelMdViewer.refreshPreview",
+    "onCommand:babelMdViewer.openTranslationPreview",
+    "onCommand:babelMdViewer.refreshTranslationPreview",
+    "onCommand:babelMdViewer.configureTranslationApiKey"
   ],
   "contributes": {
     "commands": [
