@@ -501,8 +501,6 @@ export class TranslationPreviewManager implements vscode.Disposable {
     const escapeHtml = (value: string): string =>
       value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const escapeAttribute = (value: string): string => escapeHtml(value).replace(/"/g, '&quot;');
-    const imageIcon = `<svg class="preview__exportIconSvg" viewBox="0 0 24 24" role="presentation" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v9.5A1.5 1.5 0 0 1 20.5 19H3.5A1.5 1.5 0 0 1 2 17.5V8a1.5 1.5 0 0 1 1.5-1.5Zm3 4 2 2.5 2.5-3.5 3.5 5h-11Zm0-2.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z"/></svg>`;
-    const pdfIcon = `<svg class="preview__exportIconSvg" viewBox="0 0 24 24" role="presentation" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M8 4h5l4 4v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm5 0v4h4m-8.5 4.25h2.1c.9 0 1.4.62 1.4 1.38 0 .77-.5 1.37-1.4 1.37h-1.1v2h-1v-4.75Zm5 0h1.3c.92 0 1.7.67 1.7 1.75 0 1.05-.78 1.75-1.7 1.75h-.3v1.5h-1v-5Zm-4 1v1.37h.95c.28 0 .55-.2.55-.68 0-.44-.24-.7-.55-.7Z"/></svg>`;
 
   return `<!DOCTYPE html>
 <html lang="${escapeAttribute(localeBundle.languageTag)}">
@@ -600,7 +598,7 @@ export class TranslationPreviewManager implements vscode.Disposable {
     .preview__exportButton {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 0;
       padding: 5px 10px;
       font-size: 0.82rem;
       border-radius: 4px;
@@ -619,12 +617,6 @@ export class TranslationPreviewManager implements vscode.Disposable {
     .preview__exportButton[disabled] {
       opacity: 0.6;
       cursor: wait;
-    }
-
-    .preview__exportIconSvg {
-      width: 14px;
-      height: 14px;
-      display: inline-block;
     }
 
     .preview__exportError {
@@ -724,10 +716,10 @@ export class TranslationPreviewManager implements vscode.Disposable {
     <header class="preview__header">
       <p id="preview-status" class="preview__status" role="status" aria-live="polite" data-state="idle"></p>
       <div class="preview__actions">
-        <button type="button" class="preview__exportButton" data-export-format="png">${imageIcon}<span>${escapeHtml(
+        <button type="button" class="preview__exportButton" data-export-format="png"><span>${escapeHtml(
           localeBundle.exportControls.imageButtonLabel,
         )}</span></button>
-        <button type="button" class="preview__exportButton" data-export-format="pdf">${pdfIcon}<span>${escapeHtml(
+        <button type="button" class="preview__exportButton" data-export-format="pdf"><span>${escapeHtml(
           localeBundle.exportControls.pdfButtonLabel,
         )}</span></button>
         <span id="preview-export-error" class="preview__exportError" hidden>${escapeHtml(

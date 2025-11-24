@@ -3,7 +3,7 @@
   "extension.description": "在 VSCode 中通过 AI 翻译 Markdown, 支持任何符合 Openai 的标准的 api 请求配置。",
   "command.openPreview.title": "Babel Markdown：打开预览",
   "command.refreshPreview.title": "Babel Markdown：刷新预览",
-  "command.openTranslationPreview.title": "Babel Markdown：打开翻译预览",
+  "command.openTranslationPreview.title": "打开翻译预览",
   "command.refreshTranslationPreview.title": "Babel Markdown：刷新翻译预览",
   "command.configureTranslationApiKey.title": "Babel Markdown：设置翻译 API 密钥",
   "command.exportMarkdownAsImage.title": "导出 Markdown 为 PNG",

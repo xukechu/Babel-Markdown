@@ -3,7 +3,7 @@
   "extension.description": "Preview Markdown files transformed with Babel-style pipelines inside VS Code.",
   "command.openPreview.title": "Babel Markdown: Open Preview",
   "command.refreshPreview.title": "Babel Markdown: Refresh Preview",
-  "command.openTranslationPreview.title": "Babel Markdown: Open Translation Preview",
+  "command.openTranslationPreview.title": "Open Translation Preview",
   "command.refreshTranslationPreview.title": "Babel Markdown: Refresh Translation Preview",
   "command.configureTranslationApiKey.title": "Babel Markdown: Set Translation API Key",
   "command.exportMarkdownAsImage.title": "Export Markdown as PNG",
