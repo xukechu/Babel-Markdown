@@ -11,6 +11,7 @@ Babel Markdown brings real-time AI translation previews to VS Code so you can co
 ### Highlights
 - **Progressive translation preview**: streams segments as they finish translating.
 - **Markdown fidelity**: preserves headings, lists, tables, and code blocks exactly.
+- **One-click exports**: right-click any Markdown to export the rendered preview as PNG or PDF; translation preview panel also supports direct export.
 - **Adaptive batching & parallelism**: merges short sections and balances concurrency for responsive yet stable runs.
 - **Caching & recovery**: reuses previous translations and falls back to cached or placeholder content when errors occur.
 - **OpenAI-compatible API support**: customize base URL, model, language, and timeout for any compatible provider.
@@ -41,6 +42,7 @@ Babel Markdown 为 VS Code 提供实时翻译预览能力，让原文 Markdown �
 ### 主要特性
 - **渐进式翻译预览**：按段落流式更新翻译结果，阅读无需等待整篇完成。
 - **Markdown 结构保真**：保留标题、列表、代码块、表格等格式，翻译内容可直接复制使用。
+- **一键导出**：右键 Markdown 即可将预览效果导出为 PNG/PDF，翻译预览面板同样支持直接导出。
 - **自适应分段与并行处理**：自动合并短段落并控制并发度，平衡速度与稳定性。
 - **缓存与错误恢复**：复用历史片段并在异常时回退缓存或原文，确保预览不中断。
 - **面向 OpenAI 兼容 API**：自定义 Base URL、模型、语言与超时，兼容第三方服务。
