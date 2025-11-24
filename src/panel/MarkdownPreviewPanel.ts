@@ -5,6 +5,7 @@ import type { BabelMarkdownService, TransformationResult } from '../services/Bab
 import { getLanguageTag, localize } from '../i18n/localize';
 import { ExtensionLogger } from '../utils/logger';
 import { MarkdownExportService } from '../services/MarkdownExportService';
+import { buildPreviewStyles } from '../utils/previewStyles';
 
 type ExportFormat = 'png' | 'pdf';
 
@@ -168,6 +169,12 @@ export class MarkdownPreviewPanel implements vscode.Disposable {
     const csp = `default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; connect-src ${webview.cspSource} https: data:;`;
     const imageIcon = `<svg class="preview-actions__iconSvg" viewBox="0 0 24 24" role="presentation" focusable="false"><path fill="currentColor" d="M4 6h16a2 2 0 0 1 2 2v10.5A1.5 1.5 0 0 1 20.5 20h-17A1.5 1.5 0 0 1 2 18.5V8a2 2 0 0 1 2-2Zm0 2v10h16V8zm3.5 1.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm11 7.25-3.25-4.24-2.54 3.39-1.71-2.06L7.5 17.75z"/></svg>`;
     const pdfIcon = `<svg class="preview-actions__iconSvg" viewBox="0 0 24 24" role="presentation" focusable="false"><path fill="currentColor" d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 2H6v18h12V8h-4zm-2.5 6H13c1.38 0 2.5 1.12 2.5 2.5S14.38 15 13 15h-.5v3H11.5V10Zm1.5 1.5H11.5v2h1.5a1 1 0 0 0 0-2Z"/></svg>`;
+    const sharedStyles = buildPreviewStyles({
+      theme: result.theme,
+      background,
+      foreground,
+      border,
+    });
 
     return `<!DOCTYPE html>
 <html lang="${this.escapeHtml(languageTag)}">
@@ -177,28 +184,7 @@ export class MarkdownPreviewPanel implements vscode.Disposable {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
   <style>
-    :root {
-      color-scheme: ${result.theme};
-    }
-
-    body {
-      background: ${background};
-      color: ${foreground};
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 24px;
-      line-height: 1.6;
-    }
-
-    main {
-      max-width: 960px;
-      margin: 0 auto;
-      background: ${isDark ? '#252526' : '#ffffff'};
-      border: 1px solid ${border};
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: ${isDark ? 'none' : '0 10px 24px rgba(15, 23, 42, 0.08)'};
-    }
+    ${sharedStyles}
 
     header {
       display: flex;
@@ -266,15 +252,6 @@ export class MarkdownPreviewPanel implements vscode.Disposable {
       margin: 0;
       color: ${isDark ? '#f28b82' : '#9b2226'};
       font-size: 0.85rem;
-    }
-
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    code {
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
     }
 
     .preview-source {

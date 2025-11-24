@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { createHash } from 'crypto';
+import MarkdownIt from 'markdown-it';
 
 import { ExtensionLogger } from '../utils/logger';
 import { getExtensionConfiguration } from '../utils/config';
-import { escapeHtml } from '../utils/text';
 
 export interface TransformationResult {
   html: string;
@@ -45,8 +45,13 @@ export class BabelMarkdownService {
       this.logger.warn('Babel plugins are declared but the pipeline is not implemented yet.');
     }
 
-    const escaped = escapeHtml(content);
-    return `<pre>${escaped}</pre>`;
+    const markdown = new MarkdownIt({
+      html: false,
+      linkify: true,
+      breaks: false,
+    });
+
+    return markdown.render(content);
   }
 
   private computeContentHash(

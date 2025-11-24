@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 
+import type { TransformationResult, BabelMarkdownService } from './BabelMarkdownService';
 import { MarkdownExportService, ExportFormat } from './MarkdownExportService';
 import { ExtensionLogger } from '../utils/logger';
-import { localize } from '../i18n/localize';
+import { getLanguageTag, localize } from '../i18n/localize';
+import { buildPreviewStyles } from '../utils/previewStyles';
 
 type CaptureResult = {
   dataUrl: string;
@@ -18,6 +20,7 @@ export class EditorExportService {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly exportService: MarkdownExportService,
+    private readonly markdownService: BabelMarkdownService,
     private readonly logger: ExtensionLogger,
   ) {}
 
@@ -54,6 +57,7 @@ export class EditorExportService {
   }
 
   private async captureDocument(editor: vscode.TextEditor): Promise<CaptureResult> {
+    const transform = await this.markdownService.transformDocument(editor.document);
     const panel = vscode.window.createWebviewPanel(
       'babelMdViewer.exportWorker',
       localize('export.worker.title'),
@@ -69,7 +73,7 @@ export class EditorExportService {
       },
     );
 
-    const html = this.buildWorkerHtml(editor, panel.webview);
+    const html = this.buildPreviewHtml(transform, panel.webview, editor.document);
 
     return new Promise<CaptureResult>((resolve, reject) => {
       let settled = false;
@@ -106,106 +110,61 @@ export class EditorExportService {
     });
   }
 
-  private buildWorkerHtml(editor: vscode.TextEditor, webview: vscode.Webview): string {
-    const exportScriptUri = webview
-      .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'exportBridge.js'))
-      .toString();
+  private buildPreviewHtml(
+    result: TransformationResult,
+    webview: vscode.Webview,
+    document: vscode.TextDocument,
+  ): string {
+    const isDark = result.theme === 'dark';
+    const background = isDark ? '#1e1e1e' : '#ffffff';
+    const foreground = isDark ? '#d4d4d4' : '#1e1e1e';
+    const border = isDark ? '#2d2d2d' : '#e5e5e5';
+    const languageTag = getLanguageTag();
+    const title = this.escapeHtml(localize('preview.markdownHtmlTitle'));
+    const sourceMarkdown = this.escapeHtml(result.sourceMarkdown);
+    const exportScriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'exportBridge.js'),
+    );
     const nonce = this.createNonce();
-    const theme = vscode.window.activeColorTheme.kind;
-    const palette = this.getPalette(theme);
-    const fontFamily = this.getFontFamily(editor);
-    const fontSize = this.getFontSize(editor);
-    const lineHeightPx = this.getLineHeight(editor, fontSize);
-    const tabSize = this.getTabSize(editor);
-    const documentText = editor.document.getText().replace(/\r\n/g, '\n');
-    const lineHtml = this.renderLines(documentText);
-    const csp = `default-src 'none'; img-src ${webview.cspSource} data:; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource}; connect-src ${webview.cspSource} https: data:;`;
+    const csp = `default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; connect-src ${webview.cspSource} https: data:;`;
+    const documentLabel =
+      document.uri.scheme === 'file'
+        ? vscode.workspace.asRelativePath(document.uri)
+        : document.uri.path;
+
+    const sharedStyles = buildPreviewStyles({
+      theme: result.theme,
+      background,
+      foreground,
+      border,
+    });
 
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${this.escapeHtml(languageTag)}">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style nonce="${nonce}">
-    :root {
-      color-scheme: ${palette.colorScheme};
-    }
+  <title>${title}</title>
+  <style>
+    ${sharedStyles}
 
-    body {
-      margin: 0;
-      padding: 18px;
-      background: ${palette.surface};
-      color: ${palette.foreground};
-      font-family: ${fontFamily};
-    }
-
-    .export-shell {
-      background: ${palette.background};
-      border: 1px solid ${palette.border};
-      border-radius: 8px;
-      box-shadow: ${palette.shadow};
-      overflow: hidden;
-    }
-
-    .export-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid ${palette.border};
-      color: ${palette.header};
-      font-size: 12px;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-    }
-
-    .export-content {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      background: ${palette.background};
-      color: ${palette.foreground};
-      font-family: ${fontFamily};
-      font-size: ${fontSize}px;
-      line-height: ${lineHeightPx}px;
-      tab-size: ${tabSize};
-    }
-
-    .gutter {
-      background: ${palette.gutterBackground};
-      color: ${palette.gutter};
-      border-right: 1px solid ${palette.border};
-      padding: 12px 8px 12px 12px;
-      text-align: right;
-      user-select: none;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .gutter-line {
-      display: block;
-      padding: 0 8px 0 0;
-    }
-
-    .code {
-      padding: 12px 16px;
-      white-space: pre;
-      overflow: visible;
-    }
-
-    .code-line {
-      display: block;
-      white-space: pre;
+    #capture-root section {
+      padding: 4px 0;
     }
   </style>
 </head>
 <body>
-  <main id="capture-root" class="export-shell">
-    <header class="export-header">Markdown · ${this.escapeHtml(
-      editor.document.fileName.split(/[\\/]/).pop() ?? 'untitled',
-    )}</header>
-    <section class="export-content">
-      <div class="gutter">${this.renderGutter(documentText)}</div>
-      <div class="code">${lineHtml}</div>
+  <main id="capture-root">
+    <header>
+      <strong>${this.escapeHtml(localize('preview.markdownPanelTitle', { document: documentLabel }))}</strong>
+      <span>${this.escapeHtml(documentLabel)}</span>
+    </header>
+    <section id="preview-root">
+      ${result.html}
+    </section>
+    <section id="preview-source-export" aria-hidden="true" hidden>
+      <pre>${sourceMarkdown}</pre>
     </section>
   </main>
   <script nonce="${nonce}" src="${exportScriptUri}"></script>
@@ -223,105 +182,10 @@ export class EditorExportService {
           vscode.postMessage({ type: 'error', payload: error?.message || String(error) }),
         );
     }
-
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'capture') {
-        capture();
-      }
-    });
-
     window.addEventListener('load', capture);
   </script>
 </body>
 </html>`;
-  }
-
-  private renderLines(content: string): string {
-    const lines = content.split(/\r?\n/);
-    return lines
-      .map((line) => `<span class="code-line">${this.escapeHtml(line || ' ')}</span>`)
-      .join('');
-  }
-
-  private renderGutter(content: string): string {
-    const lines = content.split(/\r?\n/);
-    return lines
-      .map((_, index) => `<span class="gutter-line">${index + 1}</span>`)
-      .join('');
-  }
-
-  private getFontFamily(editor: vscode.TextEditor): string {
-    const configured = vscode.workspace.getConfiguration('editor').get<string>('fontFamily');
-    if (configured && configured.trim()) {
-      return configured;
-    }
-    return `'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace`;
-  }
-
-  private getFontSize(editor: vscode.TextEditor): number {
-    const configured = vscode.workspace.getConfiguration('editor').get<number>('fontSize');
-    if (configured && Number.isFinite(configured) && configured > 0) {
-      return configured;
-    }
-    return 14;
-  }
-
-  private getLineHeight(editor: vscode.TextEditor, fontSize: number): number {
-    const configured = vscode.workspace.getConfiguration('editor').get<number>('lineHeight');
-    if (configured && Number.isFinite(configured) && configured > 0) {
-      return configured;
-    }
-    return Math.round(fontSize * 1.6);
-  }
-
-  private getTabSize(editor: vscode.TextEditor): number {
-    const option = editor.options.tabSize;
-    if (typeof option === 'number' && Number.isFinite(option) && option > 0) {
-      return option;
-    }
-    const configured = vscode.workspace.getConfiguration('editor').get<number>('tabSize');
-    if (configured && Number.isFinite(configured) && configured > 0) {
-      return configured;
-    }
-    return 4;
-  }
-
-  private getPalette(theme: vscode.ColorThemeKind): {
-    background: string;
-    surface: string;
-    gutter: string;
-    gutterBackground: string;
-    border: string;
-    foreground: string;
-    header: string;
-    shadow: string;
-    colorScheme: 'light' | 'dark';
-  } {
-    if (theme === vscode.ColorThemeKind.Light) {
-      return {
-        background: '#ffffff',
-        surface: '#f3f4f6',
-        gutter: '#6b7280',
-        gutterBackground: '#f8fafc',
-        border: '#e5e7eb',
-        foreground: '#111827',
-        header: '#4b5563',
-        shadow: '0 10px 24px rgba(0, 0, 0, 0.08)',
-        colorScheme: 'light',
-      };
-    }
-
-    return {
-      background: '#1e1e1e',
-      surface: '#121212',
-      gutter: '#9ca3af',
-      gutterBackground: '#18181b',
-      border: '#2d2d2d',
-      foreground: '#d4d4d4',
-      header: '#9ca3af',
-      shadow: '0 10px 24px rgba(0, 0, 0, 0.35)',
-      colorScheme: 'dark',
-    };
   }
 
   private escapeHtml(value: string): string {
@@ -346,11 +210,11 @@ export class EditorExportService {
         : document.uri.path.split(/[\\/]/).pop();
 
     if (!baseName) {
-      return 'markdown-source';
+      return 'markdown-preview';
     }
 
     const index = baseName.lastIndexOf('.');
     const stripped = index >= 0 ? baseName.slice(0, index) : baseName;
-    return `${stripped}-source`;
+    return `${stripped}-preview`;
   }
 }

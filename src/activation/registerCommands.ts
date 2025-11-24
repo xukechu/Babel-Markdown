@@ -21,7 +21,12 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Dispo
   const logger = new ExtensionLogger();
   const service = new BabelMarkdownService(logger);
   const exportService = new MarkdownExportService(logger);
-  const editorExportService = new EditorExportService(context.extensionUri, exportService, logger);
+  const editorExportService = new EditorExportService(
+    context.extensionUri,
+    exportService,
+    service,
+    logger,
+  );
   const previewPanel = new MarkdownPreviewPanel(
     context.extensionUri,
     service,
