@@ -126,7 +126,7 @@ export class EditorExportService {
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'exportBridge.js'),
     );
     const nonce = this.createNonce();
-    const csp = `default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; connect-src ${webview.cspSource} https: data:;`;
+    const csp = `default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; connect-src ${webview.cspSource} https: data:;`;
     const sharedStyles = buildPreviewStyles({
       theme: result.theme,
       background,
@@ -161,17 +161,56 @@ export class EditorExportService {
   <script nonce="${nonce}" src="${exportScriptUri}"></script>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    function capture() {
+    function waitForImages() {
+      const images = Array.from(document.images);
+      if (images.length === 0) {
+        return Promise.resolve();
+      }
+
+      const decodeSafely = (img) => {
+        if (typeof img.decode === 'function') {
+          return img.decode().catch(() => undefined);
+        }
+        if (img.complete) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          img.onload = () => resolve(undefined);
+          img.onerror = () => resolve(undefined);
+        });
+      };
+
+      const ensureDimensions = () =>
+        new Promise((resolve) => {
+          const start = Date.now();
+          const check = () => {
+            const allSized = images.every((im) => im.naturalWidth > 0 && im.naturalHeight > 0);
+            if (allSized || Date.now() - start > 1500) {
+              resolve(undefined);
+              return;
+            }
+            requestAnimationFrame(check);
+          };
+          check();
+        });
+
+      return Promise.all(images.map(decodeSafely)).then(() => ensureDimensions());
+    }
+
+    async function capture() {
       const target = document.getElementById('capture-root');
       if (!window.__babelMdViewerExport?.captureElement) {
         vscode.postMessage({ type: 'error', payload: 'Capture bridge unavailable.' });
         return;
       }
+      await waitForImages();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       window.__babelMdViewerExport.captureElement(target)
         .then((result) => vscode.postMessage({ type: 'captured', payload: result }))
-        .catch((error) =>
-          vscode.postMessage({ type: 'error', payload: error?.message || String(error) }),
-        );
+        .catch((error) => {
+          const message = error?.message || String(error);
+          vscode.postMessage({ type: 'error', payload: message });
+        });
     }
     window.addEventListener('load', capture);
   </script>
